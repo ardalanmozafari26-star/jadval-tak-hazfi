@@ -40,6 +40,7 @@ const Store = (() => {
       targetSize: parseInt(data.targetSize || '8', 10),
       startDate: data.startDate || '', endDate: data.endDate || '',
       place: data.place || '', desc: data.desc || '',
+      color: (/^#[0-9a-fA-F]{6}$/.test(data.color || '') ? data.color : null),
       status: 'setup',
       settings: {
         thirdPlace: data.thirdPlace !== false,

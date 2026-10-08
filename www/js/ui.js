@@ -68,12 +68,24 @@ const UI = (() => {
 
   function renderHeader() {
     const t = Store.active();
+    applyBrand(t);
     if (!t) { $('tournamentName').textContent = 'جدول تک حذفی'; $('tournamentMeta').textContent = 'تورنمنتی انتخاب نشده'; return; }
     $('tournamentName').textContent = t.name;
     const played = Engine.allMatches(t).filter(x => x.m.status === 'done').length;
     const total = Engine.allMatches(t).length;
     $('tournamentMeta').textContent = (SPORTS[t.sport] || '') + ' • ' + t.teams.length + ' تیم • ' +
       (STATUS[t.status] || '') + (total ? ' • ' + played + ' از ' + total + ' بازی' : '');
+  }
+
+  /* رنگ برند تورنمنت فعال روی کل اپ */
+  function applyBrand(t) {
+    try {
+      const b = brandColorOf(t || null);
+      const root = document.documentElement.style;
+      root.setProperty('--brand', b);
+      root.setProperty('--brand-d', shade(b, .28));
+      root.setProperty('--brand-soft', hexA(b, .14));
+    } catch (e) {}
   }
 
   function renderDrawer() {
@@ -279,7 +291,7 @@ const UI = (() => {
     $('teamsCount').textContent = 'تیم‌ها (' + Engine.faNum(t.teams.length) + ')';
     $('teamsList').innerHTML = t.teams.length ? t.teams.map(tm => {
       const r = t.rounds.length ? Engine.record(t, tm.id) : null;
-      return '<div class="team-row">' + avatar(tm) +
+      return '<div class="team-row" style="--tc:' + (tm.color || '#94a3b8') + '">' + avatar(tm) +
         '<div class="info"><div class="n">' + esc(tm.name) + '</div><div class="m">' +
         (tm.coach ? 'مربی: ' + esc(tm.coach) + ' • ' : '') + (tm.rank ? 'سید ' + Engine.faNum(tm.rank) + ' • ' : '') +
         (r ? r.won + ' برد - ' + r.lost + ' باخت' : 'بدون بازی') + '</div></div>' +
@@ -333,10 +345,11 @@ const UI = (() => {
     box.innerHTML =
       '<div class="view-head"><h3>آمار تورنمنت</h3><div><button class="btn small" onclick="Export.pngStats()">🖼️ عکس آمار</button></div></div>' +
       (champ ? '<div class="champ"><div class="t">🏆 قهرمان تورنمنت</div><div class="n">' + esc(champ.name) + '</div></div>' : '') +
-      '<h3>رده‌بندی نهایی</h3>' + rank.map((r, i) =>
-        '<div class="rank-row"><span class="pos">' + Engine.faNum(i + 1) + '</span>' +
-        avatar(teamById(t, r.id)) +
-        '<span class="nm">' + esc(Engine.teamName(t, r.id)) + '</span><span class="ti">' + esc(r.title) + '</span></div>').join('') +
+      '<h3>رده‌بندی نهایی</h3>' + rank.map((r, i) => {
+        const rtm = teamById(t, r.id);
+        return '<div class="rank-row" style="--tc:' + ((rtm && rtm.color) || '#94a3b8') + '"><span class="pos">' + Engine.faNum(i + 1) + '</span>' +
+        avatar(rtm) +
+        '<span class="nm">' + esc(Engine.teamName(t, r.id)) + '</span><span class="ti">' + esc(r.title) + '</span></div>'; }).join('') +
       '<h3>جدول عملکرد تیم‌ها</h3><table class="stats"><tr><th>تیم</th><th>بازی</th><th>برد</th><th>باخت</th><th>زده</th><th>خورده</th><th>تفاضل</th></tr>' +
       rows.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.played) + '</td><td>' + Engine.faNum(r.won) +
         '</td><td>' + Engine.faNum(r.lost) + '</td><td>' + Engine.faNum(r.gf) + '</td><td>' + Engine.faNum(r.ga) +
@@ -419,6 +432,9 @@ const UI = (() => {
 
   function openTournamentDialog(edit) {
     const t = edit ? Store.active() : null;
+    UI._tColor = t ? (t.color || '') : '';
+    const swHtml = '<button type="button" class="sw auto' + (!UI._tColor ? ' sel' : '') + '" title="خودکار" onclick="UI.pickColor(this,\'\')"></button>' +
+      SPORT_PALETTE.map(c => '<button type="button" class="sw' + (UI._tColor === c ? ' sel' : '') + '" style="background:' + c + '" onclick="UI.pickColor(this,\'' + c + '\')"></button>').join('');
     openModal('<h2>' + (t ? 'ویرایش تورنمنت' : 'تورنمنت جدید') + '</h2>' +
       '<div class="field"><label>نام تورنمنت</label><input id="f_name" value="' + esc(t ? t.name : '') + '" placeholder="مثال: جام رمضان"></div>' +
       '<div class="field"><label>رشته ورزشی</label><select id="f_sport">' +
@@ -434,11 +450,18 @@ const UI = (() => {
       '<div class="field"><label>قرعه استراحت</label><select id="f_bye">' +
       '<option value="top"' + (t && t.settings.byeTo === 'top' ? ' selected' : '') + '>به سیدهای بالا</option>' +
       '<option value="random"' + (t && t.settings.byeTo === 'random' ? ' selected' : '') + '>تصادفی</option></select></div>' +
+      '<div class="field"><label>رنگ تورنمنت (خودکار = رنگ رشته)</label><div class="swatches" id="t_sw">' + swHtml + '</div></div>' +
       '<div class="modal-btns"><button class="btn primary" onclick="UI.saveTournament(' + (t ? '\'' + t.id + '\'' : 'null') + ')">ذخیره</button>' +
       '<button class="btn" onclick="UI.closeModal()">انصراف</button></div>');
   }
+  function pickColor(el, c) {
+    UI._tColor = c || '';
+    const box = $('t_sw');
+    if (box) box.querySelectorAll('.sw').forEach(b => b.classList.remove('sel'));
+    if (el) el.classList.add('sel');
+  }
   function saveTournament(id) {
-    const data = { name: $('f_name').value, sport: $('f_sport').value, targetSize: $('f_size').value, startDate: $('f_start').value, place: $('f_place').value };
+    const data = { name: $('f_name').value, sport: $('f_sport').value, targetSize: $('f_size').value, startDate: $('f_start').value, place: $('f_place').value, color: UI._tColor || null };
     if (!data.name.trim()) { alert('نام تورنمنت الزامی است.'); return; }
     if (id) {
       const t = Store.active();
@@ -797,7 +820,7 @@ const UI = (() => {
     openBulkDialog, saveBulk, bulkFile, openDrawDialog, drawPreview, manualMove, doDraw,
     openSwapDialog, doSwap,
     openMatchDialog, matchTypeToggle, saveMatchResult, saveMatchSchedule, clearMatch, toggleLock,
-    onPhotoInput, clearMatchPhoto,
+    onPhotoInput, clearMatchPhoto, pickColor, applyBrand,
     addScorerRow, delScorerRow, syncScorer, renderScorerRows,
     zoom, zoomReset, saveTournamentSettings, saveAppSettings,
     resetBracket, deleteTournament, duplicateTournament,

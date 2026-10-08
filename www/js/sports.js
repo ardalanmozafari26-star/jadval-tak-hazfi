@@ -2,7 +2,7 @@
    قرارداد سید: عدد کوچک‌تر = قوی‌تر (۱ قوی‌ترین) */
 const SPORTS_META = {
   football: {
-    name: 'فوتبال',
+    name: 'فوتبال', color: '#16a34a',
     mvpStats: [
       { key: 'goals', label: 'گل' },
       { key: 'assists', label: 'پاس گل' },
@@ -11,7 +11,7 @@ const SPORTS_META = {
     primary: 'goals'
   },
   futsal: {
-    name: 'فوتسال',
+    name: 'فوتسال', color: '#0d9488',
     mvpStats: [
       { key: 'goals', label: 'گل' },
       { key: 'assists', label: 'پاس گل' }
@@ -19,7 +19,7 @@ const SPORTS_META = {
     primary: 'goals'
   },
   volleyball: {
-    name: 'والیبال',
+    name: 'والیبال', color: '#2563eb',
     mvpStats: [
       { key: 'points', label: 'امتیاز' },
       { key: 'blocks', label: 'دفاع' },
@@ -28,7 +28,7 @@ const SPORTS_META = {
     primary: 'points'
   },
   basketball: {
-    name: 'بسکتبال',
+    name: 'بسکتبال', color: '#ea580c',
     mvpStats: [
       { key: 'points', label: 'امتیاز' },
       { key: 'reb', label: 'ریباند' },
@@ -37,7 +37,7 @@ const SPORTS_META = {
     primary: 'points'
   },
   tennis: {
-    name: 'تنیس',
+    name: 'تنیس', color: '#65a30d',
     mvpStats: [
       { key: 'aces', label: 'ایس' },
       { key: 'winners', label: 'وینر' }
@@ -45,7 +45,7 @@ const SPORTS_META = {
     primary: 'aces'
   },
   wrestling: {
-    name: 'کشتی',
+    name: 'کشتی', color: '#dc2626',
     mvpStats: [
       { key: 'tech', label: 'امتیاز فنی' },
       { key: 'fall', label: 'ضربه فنی', type: 'check' }
@@ -53,11 +53,34 @@ const SPORTS_META = {
     primary: 'tech'
   },
   custom: {
-    name: 'آزاد',
+    name: 'آزاد', color: '#9333ea',
     mvpStats: [{ key: 'score', label: 'امتیاز' }],
     primary: 'score'
   }
 };
+/* پالت پیشنهادی رنگ برند */
+const SPORT_PALETTE = ['#16a34a', '#0d9488', '#2563eb', '#9333ea', '#dc2626', '#ea580c', '#eab308'];
+/* رنگ برند تورنمنت: انتخاب کاربر، وگرنه رنگ رشته */
+function brandColorOf(t) {
+  if (t && /^#[0-9a-fA-F]{6}$/.test(t.color || '')) return t.color;
+  const m = (t && SPORTS_META[t.sport]) || SPORTS_META.custom;
+  return (m && m.color) || '#16a34a';
+}
+/* افزودن آلفا به رنگ hex: hexA('#16a34a', .14) -> '#16a34a24' */
+function hexA(hex, a) {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(hex || '');
+  if (!m) return 'rgba(22,163,74,.14)';
+  const v = Math.round(Math.max(0, Math.min(1, a)) * 255).toString(16).padStart(2, '0');
+  return '#' + m[1] + v;
+}
+/* تیره‌تر کردن رنگ hex به نسبت amt (۰ تا ۱) */
+function shade(hex, amt) {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(hex || '');
+  if (!m) return '#15803d';
+  const n = parseInt(m[1], 16), f = 1 - Math.max(0, Math.min(1, amt));
+  const c = v => Math.round(Math.max(0, Math.min(255, v * f)));
+  return '#' + [c(n >> 16), c((n >> 8) & 255), c(n & 255)].map(v => v.toString(16).padStart(2, '0')).join('');
+}
 /* مقدار سید برای مرتب‌سازی: ۱ قوی‌ترین؛ خالی/صفر = بدون سید (آخر) */
 function rankVal(r) {
   const n = parseInt(r, 10);
