@@ -897,6 +897,9 @@ const UI = (() => {
         : '<input id="ms_' + s.key + '" type="number" min="0" value="' + v + '">';
       return '<label style="flex:1;min-width:70px;font-size:11px">' + s.label + input + '</label>';
     }).join('');
+    const showScorers = (t.sport === 'football' || t.sport === 'futsal' || t.settings.scoring === 'goals') && series === 1 && canPlay;
+    UI._scorers = Array.isArray(m.scorers) ? JSON.parse(JSON.stringify(m.scorers)) : [];
+    UI._scCtx = { a: m.a, b: m.b, aN, bN };
     openModal('<h2>' + esc(aN) + ' — ' + esc(bN) + '</h2>' +
       '<p style="font-size:12px;color:var(--muted)">' + (num ? 'بازی ' + Engine.faNum(num) + ' • ' : '') + esc((m.title || '') + ' • وضعیت: ' + (m.status === 'done' ? 'تمام‌شده' : 'زمان‌بندی‌شده')) + '</p>' +
       (m.result && m.result.type === 'bye' ? '<p>این بازی با قرعه استراحت تعیین شد.</p>' :
