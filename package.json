@@ -1,0 +1,16 @@
+{
+  "name": "jadval-tak-hazfi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "اپلیکیشن حرفه‌ای جدول تک حذفی - Single Elimination Bracket",
+  "scripts": {
+    "sync": "npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.1.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.4",
+    "@capacitor/android": "^6.1.4"
+  }
+}

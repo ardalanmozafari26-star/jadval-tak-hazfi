@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f172a">
+<title>جدول تک حذفی</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div id="splash">
+  <div class="splash-box">
+    <div class="splash-icon">🏆</div>
+    <div class="splash-title">جدول تک حذفی</div>
+    <div class="splash-sub">مدیریت حرفه‌ای تورنمنت‌ها</div>
+    <div class="splash-bar"><i></i></div>
+  </div>
+</div>
+
+<header id="appbar">
+  <button id="menuBtn" class="icon-btn" aria-label="تورنمنت‌ها">☰</button>
+  <div class="appbar-titles">
+    <div id="tournamentName" class="appbar-title">—</div>
+    <div id="tournamentMeta" class="appbar-sub">—</div>
+  </div>
+  <button id="newTournamentBtn" class="icon-btn" aria-label="تورنمنت جدید">＋</button>
+</header>
+
+<aside id="drawer" class="drawer">
+  <div class="drawer-head">
+    <strong>تورنمنت‌ها</strong>
+    <button id="drawerClose" class="icon-btn">✕</button>
+  </div>
+  <div id="tournamentList" class="drawer-list"></div>
+  <button id="drawerNew" class="btn primary block">＋ تورنمنت جدید</button>
+</aside>
+<div id="drawerOverlay" class="overlay hidden"></div>
+
+<main id="views">
+  <!-- خانه -->
+  <section id="view-home" class="view">
+    <div id="homeEmpty" class="empty hidden">
+      <div class="empty-icon">🏟️</div>
+      <p>هنوز تورنمنتی نساخته‌ای.</p>
+      <button class="btn primary" onclick="UI.openTournamentDialog()">ساخت اولین تورنمنت</button>
+    </div>
+    <div id="homeContent" class="hidden">
+      <div class="cards-row" id="homeStats"></div>
+      <h3>بازی‌های امروز</h3>
+      <div id="homeToday" class="carousel"></div>
+      <h3>بازی‌های پیش رو</h3>
+      <div id="homeUpcoming" class="carousel"></div>
+      <h3>آخرین نتایج</h3>
+      <div id="homeRecent" class="carousel"></div>
+    </div>
+  </section>
+
+  <!-- جدول -->
+  <section id="view-bracket" class="view hidden">
+    <div id="bracketEmpty" class="empty hidden">
+      <div class="empty-icon">🎲</div>
+      <p>قرعه‌کشی انجام نشده است.</p>
+      <button class="btn primary" onclick="UI.openDrawDialog()">انجام قرعه‌کشی</button>
+    </div>
+    <div id="bracketToolbar" class="bracket-toolbar hidden">
+      <div class="zoom-group">
+        <button class="btn small" onclick="UI.zoom(0.1)">＋</button>
+        <button class="btn small" onclick="UI.zoom(-0.1)">−</button>
+        <button class="btn small" onclick="UI.zoomReset()">↺</button>
+      </div>
+      <div class="toolbar-group">
+        <button class="btn small" onclick="UI.openDrawDialog()">🎲 قرعه‌کشی مجدد</button>
+        <button class="btn small" onclick="UI.toggleBracketMode()">📋 نمای فهرستی</button>
+        <button class="btn small" onclick="Export.png()">🖼️ عکس</button>
+        <button class="btn small" onclick="Export.print()">🖨️ چاپ/PDF</button>
+        <button class="btn small" onclick="Export.csv()">📊 CSV</button>
+      </div>
+    </div>
+    <div id="bracketScroll" class="bracket-scroll hidden">
+      <div id="bracket" class="bracket"></div>
+    </div>
+    <div id="bracketList" class="hidden"></div>
+    <div id="thirdPlaceBox" class="hidden"></div>
+  </section>
+
+  <!-- تیم‌ها -->
+  <section id="view-teams" class="view hidden">
+    <div class="view-head">
+      <h3 id="teamsCount">تیم‌ها</h3>
+      <div>
+        <button class="btn small" onclick="Export.pngTeams()">🖼️ عکس</button>
+        <button class="btn small" onclick="UI.openBulkDialog()">📥 افزودن گروهی</button>
+        <button class="btn small primary" onclick="UI.openTeamDialog()">＋ افزودن</button>
+      </div>
+    </div>
+    <div id="teamsList"></div>
+  </section>
+
+  <!-- مسابقات -->
+  <section id="view-matches" class="view hidden">
+    <div class="view-head">
+      <h3>مسابقات</h3>
+      <div>
+      <button class="btn small" onclick="Export.pngMatches()">🖼️ عکس</button>
+      <select id="matchFilter" onchange="UI.renderMatches()">
+        <option value="all">همه</option>
+        <option value="scheduled">زمان‌بندی‌شده</option>
+        <option value="done">تمام‌شده</option>
+      </select>
+      </div>
+    </div>
+    <div id="matchesList"></div>
+  </section>
+
+  <!-- آمار -->
+  <section id="view-stats" class="view hidden">
+    <div id="statsContent"></div>
+  </section>
+
+  <!-- تنظیمات -->
+  <section id="view-settings" class="view hidden">
+    <div class="settings-card">
+      <h3>تورنمنت فعلی</h3>
+      <label class="row"><span>بازی رده‌بندی (سوم/چهارم)</span><input type="checkbox" id="setThird" onchange="UI.saveTournamentSettings()"></label>
+      <label class="row"><span>نوع امتیاز</span>
+        <select id="setScoring" onchange="UI.saveTournamentSettings()">
+          <option value="goals">گل</option>
+          <option value="points">امتیاز</option>
+          <option value="sets">ست</option>
+        </select>
+      </label>
+      <label class="row"><span>فرمت هر تقابل (سری)</span>
+        <select id="setSeries" onchange="UI.saveTournamentSettings()">
+          <option value="1">تک‌بازی</option>
+          <option value="3">بهترین از ۳</option>
+          <option value="5">بهترین از ۵</option>
+          <option value="7">بهترین از ۷</option>
+        </select>
+      </label>
+      <label class="row"><span>قرعه استراحت (BYE)</span>
+        <select id="setBye" onchange="UI.saveTournamentSettings()">
+          <option value="top">به سیدهای بالا</option>
+          <option value="random">تصادفی</option>
+        </select>
+      </label>
+      <div class="row btns">
+        <button class="btn small" onclick="UI.openTournamentDialog(true)">✏️ ویرایش تورنمنت</button>
+        <button class="btn small" onclick="UI.duplicateTournament()">📋 کپی</button>
+        <button class="btn small danger" onclick="UI.resetBracket()">🗑️ ریست جدول</button>
+        <button class="btn small danger" onclick="UI.deleteTournament()">❌ حذف تورنمنت</button>
+      </div>
+    </div>
+    <div class="settings-card">
+      <h3>ظاهر برنامه</h3>
+      <label class="row"><span>تم تیره</span><input type="checkbox" id="setTheme" onchange="UI.saveAppSettings()"></label>
+    </div>
+    <div class="settings-card">
+      <h3>پشتیبان‌گیری</h3>
+      <div class="row btns">
+        <button class="btn small" onclick="Export.backup()">💾 خروجی بکاپ</button>
+        <button class="btn small" onclick="document.getElementById('restoreFile').click()">📂 بازیابی بکاپ</button>
+        <input type="file" id="restoreFile" accept=".json,application/json" class="hidden" onchange="Export.restore(this)">
+      </div>
+    </div>
+    <div class="settings-card about">
+      <h3>درباره</h3>
+      <p>جدول تک حذفی نسخه ۱٫۰ — مدیریت حرفه‌ای تورنمنت‌های حذفی، کاملا آفلاین.</p>
+    </div>
+  </section>
+</main>
+
+<nav id="tabbar">
+  <button data-view="home" class="active">🏠<span>خانه</span></button>
+  <button data-view="bracket">🏆<span>جدول</span></button>
+  <button data-view="teams">👥<span>تیم‌ها</span></button>
+  <button data-view="matches">📋<span>بازی‌ها</span></button>
+  <button data-view="stats">📊<span>آمار</span></button>
+  <button data-view="settings">⚙️<span>تنظیمات</span></button>
+</nav>
+
+<!-- دیالوگ عمومی -->
+<div id="modalOverlay" class="overlay hidden">
+  <div id="modal" class="modal"></div>
+</div>
+
+<script src="js/store.js"></script>
+<script src="js/sports.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/export.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

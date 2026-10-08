@@ -1,0 +1,9 @@
+{
+  "appId": "ir.jadval.takhazfi",
+  "appName": "جدول تک حذفی",
+  "webDir": "www",
+  "backgroundColor": "#0f172a",
+  "android": {
+    "allowMixedContent": false
+  }
+}

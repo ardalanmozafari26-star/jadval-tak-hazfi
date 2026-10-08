@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">جدول تک حذفی</string>
+    <string name="title_activity_main">جدول تک حذفی</string>
+    <string name="package_name">ir.jadval.takhazfi</string>
+    <string name="custom_url_scheme">ir.jadval.takhazfi</string>
+</resources>

@@ -1,0 +1,5 @@
+node_modules/
+android/app/build/
+android/.gradle/
+*.log
+C:\Users\ardalan\AppData\Local\Temp\opencode/
