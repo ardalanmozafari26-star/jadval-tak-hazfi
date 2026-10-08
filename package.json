@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "description": "اپلیکیشن حرفه‌ای جدول تک حذفی - Single Elimination Bracket",
+  "main": "electron-main.js",
   "scripts": {
-    "sync": "npx cap sync android"
+    "sync": "npx cap sync android",
+    "desktop": "electron .",
+    "dist-win": "electron-builder --win portable"
   },
   "dependencies": {
     "@capacitor/core": "^6.1.4",
@@ -13,6 +16,31 @@
   },
   "devDependencies": {
     "@capacitor/android": "^6.1.4",
-    "@capacitor/cli": "^6.1.4"
+    "@capacitor/cli": "^6.1.4",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "ir.jadval.takhazfi",
+    "productName": "جدول تک حذفی",
+    "files": [
+      "electron-main.js",
+      "www/**/*",
+      "build/icon.ico"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "JadvalTakHazfi-${version}-win64.exe"
+    }
   }
 }
