@@ -75,9 +75,10 @@ const UI = (() => {
     if (!bar || !ind) return;
     const btn = bar.querySelector('button.active');
     if (!btn) return;
+    // فقط transform (کامپوزیتور، بدون layout): مبدأ چپ، جابه‌جایی + مقیاس
     const br = bar.getBoundingClientRect(), r = btn.getBoundingClientRect();
-    ind.style.width = Math.max(0, r.width - 8) + 'px';
-    ind.style.right = (br.right - r.right + 4) + 'px';
+    const x = Math.max(0, r.left - br.left + 4), w = Math.max(8, r.width - 8);
+    ind.style.transform = 'translateX(' + x + 'px) scaleX(' + w + 'px)';
   }
 
   function switchView(v) {
@@ -200,10 +201,40 @@ const UI = (() => {
     return Engine.faDate(m.date);
   }
 
+  /* ---------- بودجه عملکرد: حرکت کم، احترام به کاربر ---------- */
+  function reducedMotion() {
+    try { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch (e) { return false; }
+  }
+  function isLite() {
+    try { return document.documentElement.dataset.lite === '1'; }
+    catch (e) { return false; }
+  }
+  function applyPerfFlags() {
+    try {
+      const cores = navigator.hardwareConcurrency || 8;
+      const mem = navigator.deviceMemory || 8;
+      if (cores <= 4 || mem <= 4) document.documentElement.dataset.lite = '1';
+    } catch (e) {}
+  }
+  function skelBars(n, h) {
+    let s = '';
+    for (let i = 0; i < n; i++) s += '<div class="skel" style="height:' + (h || 54) + 'px;margin-bottom:8px"></div>';
+    return s;
+  }
+  /* اسکلت اول، محتوای واقعی در فریم بعد (فقط جدول‌های بزرگ) */
+  function withSkel(box, n, fn) {
+    if (!box || !n || n < 1 || reducedMotion()) { fn(); return; }
+    box.innerHTML = skelBars(n);
+    requestAnimationFrame(() => requestAnimationFrame(fn));
+  }
+
   /* شمارش صعودی اعداد */
   function countUp() {
+    const instant = reducedMotion();
     document.querySelectorAll('#homeStats .v[data-n]').forEach(el => {
       const target = parseInt(el.dataset.n, 10) || 0;
+      if (instant) { el.textContent = target.toLocaleString('fa-IR'); return; }
       const t0 = performance.now(), dur = 700;
       const step = now => {
         const p = Math.min(1, (now - t0) / dur);
@@ -214,8 +245,10 @@ const UI = (() => {
     });
   }
 
-  /* بارش confetti قهرمانی */
+  /* بارش confetti قهرمانی (با احترام به حرکت/گوشی ضعیف) */
   function celebrate() {
+    buzz([40, 40, 80]);
+    if (reducedMotion() || isLite()) return;
     const cv = document.createElement('canvas');
     cv.id = 'confettiCv';
     cv.width = innerWidth; cv.height = innerHeight;
@@ -327,16 +360,26 @@ const UI = (() => {
     $('bracketList').classList.add('hidden');
     $('bracketScroll').classList.remove('hidden');
     zoomReset();
-    $('bracket').innerHTML = t.rounds.map((rd, r) =>
+    const treeHtml = t.rounds.map((rd, r) =>
       '<div class="round"><div class="round-title">' + esc(rd.title) + '</div><div class="round-matches">' +
       rd.matches.map(m => bmatch(t, m)).join('') + '</div></div>'
     ).join('');
-    const tp = t.thirdPlace;
-    const box = $('thirdPlaceBox');
-    if (tp) {
-      box.classList.remove('hidden');
-      box.innerHTML = '<h3>بازی رده‌بندی</h3>' + matchRow(t, tp, 'سوم / چهارم');
-    } else box.classList.add('hidden');
+    const paintTree = () => {
+      $('bracket').innerHTML = treeHtml;
+      const tp = t.thirdPlace;
+      const box = $('thirdPlaceBox');
+      if (tp) {
+        box.classList.remove('hidden');
+        box.innerHTML = '<h3>بازی رده‌بندی</h3>' + matchRow(t, tp, 'سوم / چهارم');
+      } else box.classList.add('hidden');
+    };
+    // جدول‌های بزرگ (۸+ بازی): اول اسکلت، بعد رندر واقعی
+    const totalM = t.rounds.reduce((n, rd) => n + rd.matches.length, 0);
+    if (totalM > 8) {
+      $('bracket').innerHTML = '<div style="min-width:280px;flex:1">' + skelBars(6, 64) + '</div>';
+      if (reducedMotion()) paintTree();
+      else requestAnimationFrame(() => requestAnimationFrame(paintTree));
+    } else paintTree();
   }
 
   function bmatch(t, m) {
@@ -443,22 +486,32 @@ const UI = (() => {
       '<table class="stats"><tr><th>بازیکن</th><th>تیم</th><th>بهترین بازیکن</th>' + (primaryLbl ? '<th>' + primaryLbl + '</th>' : '') + '</tr>' +
       mvpBoard.map(p => '<tr><td>⭐ ' + esc(p.name) + '</td><td>' + esc(Engine.teamName(t, p.team)) + '</td><td>' + Engine.faNum(p.awards) + '</td>' + (primaryLbl ? '<td>' + Engine.faNum(p.main) + '</td>' : '') + '</tr>').join('') + '</table>' : '';
     box.innerHTML =
-      '<div class="view-head"><h3>آمار تورنمنت</h3><div><button class="btn small" onclick="Export.pngStats()">🖼️ عکس آمار</button></div></div>' +
-      (champ ? '<div class="champ"><div class="t">🏆 قهرمان تورنمنت</div><div class="n">' + esc(champ.name) + '</div></div>' + champPathHtml(t) : '') +
-      '<h3>رده‌بندی نهایی</h3>' + rank.map((r, i) => {
-        const rtm = teamById(t, r.id);
-        return '<div class="rank-row" style="--tc:' + ((rtm && rtm.color) || '#94a3b8') + '"><span class="pos">' + Engine.faNum(i + 1) + '</span>' +
-        avatar(rtm) +
-        '<span class="nm">' + esc(Engine.teamName(t, r.id)) + '</span><span class="ti">' + esc(r.title) + '</span></div>'; }).join('') +
-      '<h3>جدول عملکرد تیم‌ها</h3><table class="stats"><tr><th>تیم</th><th>بازی</th><th>برد</th><th>باخت</th><th>زده</th><th>خورده</th><th>تفاضل</th></tr>' +
-      rows.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.played) + '</td><td>' + Engine.faNum(r.won) +
-        '</td><td>' + Engine.faNum(r.lost) + '</td><td>' + Engine.faNum(r.gf) + '</td><td>' + Engine.faNum(r.ga) +
-        '</td><td>' + Engine.faNum(r.gf - r.ga) + '</td></tr>').join('') + '</table>' +
-      '<h3>بازی جوانمردانه</h3><table class="stats"><tr><th>تیم</th><th>🟨</th><th>🟥</th><th>امتیاز منفی</th></tr>' +
-      fair.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.y) + '</td><td>' + Engine.faNum(r.r) +
-        '</td><td>' + Engine.faNum(r.fair) + '</td></tr>').join('') + '</table>' + mvpHtml + scorersHtml(t);
+      '<div class="view-head"><h3>آمار تورنمنت</h3><div><button class="btn small" onclick="Export.pngStats()">🖼️ عکس آمار</button></div></div>';
+    const paintStats = () => {
+      box.insertAdjacentHTML('beforeend',
+        (champ ? '<div class="champ"><div class="t">🏆 قهرمان تورنمنت</div><div class="n">' + esc(champ.name) + '</div></div>' + champPathHtml(t) : '') +
+        '<h3>رده‌بندی نهایی</h3>' + rank.map((r, i) => {
+          const rtm = teamById(t, r.id);
+          return '<div class="rank-row" style="--tc:' + ((rtm && rtm.color) || '#94a3b8') + '"><span class="pos">' + Engine.faNum(i + 1) + '</span>' +
+          avatar(rtm) +
+          '<span class="nm">' + esc(Engine.teamName(t, r.id)) + '</span><span class="ti">' + esc(r.title) + '</span></div>'; }).join('') +
+        '<h3>جدول عملکرد تیم‌ها</h3><table class="stats"><tr><th>تیم</th><th>بازی</th><th>برد</th><th>باخت</th><th>زده</th><th>خورده</th><th>تفاضل</th></tr>' +
+        rows.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.played) + '</td><td>' + Engine.faNum(r.won) +
+          '</td><td>' + Engine.faNum(r.lost) + '</td><td>' + Engine.faNum(r.gf) + '</td><td>' + Engine.faNum(r.ga) +
+          '</td><td>' + Engine.faNum(r.gf - r.ga) + '</td></tr>').join('') + '</table>' +
+        '<h3>بازی جوانمردانه</h3><table class="stats"><tr><th>تیم</th><th>🟨</th><th>🟥</th><th>امتیاز منفی</th></tr>' +
+        fair.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.y) + '</td><td>' + Engine.faNum(r.r) +
+          '</td><td>' + Engine.faNum(r.fair) + '</td></tr>').join('') + '</table>' + mvpHtml + scorersHtml(t));
+    };
+    // آمار سنگین (۱۲+ تیم): اول اسکلت، بعد محتوا
+    if (t.teams.length > 12 && !reducedMotion()) {
+      box.insertAdjacentHTML('beforeend', skelBars(6));
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        box.querySelectorAll('.skel').forEach(s => s.remove());
+        paintStats();
+      }));
+    } else paintStats();
   }
-
   /* تایم‌لاین مسیر قهرمان تا جام */
   function champPathHtml(t) {
     const path = Engine.championPath(t);
@@ -1013,6 +1066,7 @@ const UI = (() => {
     openMatchDialog, matchTypeToggle, saveMatchResult, saveMatchSchedule, clearMatch, toggleLock,
     onPhotoInput, clearMatchPhoto, pickColor, applyBrand,
     buzz, updateFab, moveTabInd, initGestures, openQuickMenu,
+    reducedMotion, isLite, applyPerfFlags,
     addScorerRow, delScorerRow, syncScorer, renderScorerRows,
     zoom, zoomReset, saveTournamentSettings, saveAppSettings,
     resetBracket, deleteTournament, duplicateTournament,

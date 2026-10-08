@@ -2,6 +2,7 @@
 (function () {
   document.addEventListener('DOMContentLoaded', () => {
     UI.applyTheme();
+    UI.applyPerfFlags();
     document.querySelectorAll('#tabbar button').forEach(b =>
       b.addEventListener('click', () => UI.switchView(b.dataset.view)));
     document.getElementById('menuBtn').addEventListener('click', UI.openDrawer);
