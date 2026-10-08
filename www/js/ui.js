@@ -158,20 +158,47 @@ const UI = (() => {
       '<text x="37" y="43" text-anchor="middle" class="pct">' + pct + '٪</text></svg><div class="sub">پیشرفت تورنمنت</div></div>' +
       '<div class="dash-card gold"><div class="sub">' + (next ? esc(next.roundTitle) + ' • بازی ' + Engine.faNum(Engine.matchNumber(t, next.m.id)) : 'بازی بعدی') + '</div>' +
       '<div class="big">' + (next ? esc(Engine.teamName(t, next.m.a)) + ' ⚔️ ' + esc(Engine.teamName(t, next.m.b)) : '—') + '</div>' +
-      '<div class="sub">' + (next && next.m.date ? (next.m.date === Engine.todayISO() ? 'امروز' + (next.m.time ? ' ساعت ' + next.m.time : '') : Engine.faDate(next.m.date)) : next ? 'بدون تاریخ' : 'همه بازی‌ها تمام شده') + '</div></div>';
+      '<div class="sub">' + (next ? countdownText(next.m) : 'همه بازی‌ها تمام شده 🎉') + '</div>' +
+      (next ? '<div class="sub">' + esc([next.m.place, next.m.ref ? 'داور: ' + next.m.ref : ''].filter(Boolean).join(' • ') || 'مکان و داور ثبت نشده') + '</div>' +
+      '<button class="btn small" style="margin-top:8px" onclick="UI.openMatchDialog(\'' + next.m.id + '\')">✍️ ثبت نتیجه</button>' : '') + '</div></div>';
     const hc = $('homeContent');
     const old = hc.querySelector('.dash');
     if (old) old.remove();
     hc.insertBefore(dash, hc.firstChild);
     const sched = all.filter(x => x.m.status !== 'done' && x.m.a && x.m.b && x.m.a !== 'BYE' && x.m.b !== 'BYE').slice(0, 5);
-    $('homeUpcoming').innerHTML = sched.length ? sched.map(x => matchRow(t, x.m, x.roundTitle)).join('') : '<p style="color:var(--muted)">بازی زمان‌بندی‌شده‌ای نیست.</p>';
+    $('homeUpcoming').innerHTML = sched.length ? sched.map(x => matchRow(t, x.m, x.roundTitle)).join('') : '<p style="color:var(--muted)">بازی بعدی که ثبت شود، اینجا می‌بینی 📌</p>';
     const today = Engine.todayISO();
     const todays = all.filter(x => x.m.date === today);
-    $('homeToday').innerHTML = todays.length ? todays.map(x => matchRow(t, x.m, x.roundTitle)).join('') : '<p style="color:var(--muted)">امروز بازی‌ای ثبت نشده.</p>';
+    $('homeToday').innerHTML = todays.length ? todays.map(x => matchRow(t, x.m, x.roundTitle)).join('') : '<p style="color:var(--muted)">امروز بازی نداری؛ استراحت کن 😌</p>';
     const recent = all.filter(x => x.m.status === 'done' && x.m.result && x.m.result.type !== 'bye').slice(-5).reverse();
-    $('homeRecent').innerHTML = recent.length ? recent.map(x => matchRow(t, x.m, x.roundTitle)).join('') : '<p style="color:var(--muted)">نتیجه‌ای ثبت نشده.</p>';
+    $('homeRecent').innerHTML = recent.length ? recent.map(x => matchRow(t, x.m, x.roundTitle)).join('') : '<p style="color:var(--muted)">هنوز نتیجه‌ای ثبت نشده؛ اولین برد را بزن! ⚽</p>';
   }
   const statCard = (v, l, n) => '<div class="stat-card"><div class="v"' + (n !== null && n !== undefined ? ' data-n="' + n + '"' : '') + '>' + v + '</div><div class="l">' + l + '</div></div>';
+
+  /* شمارش معکوس انسانی تا شروع بازی */
+  function countdownText(m) {
+    if (!m.date) return 'هنوز زمانش مشخص نیست 📅';
+    const now = new Date();
+    const dt = new Date(m.date + 'T' + (m.time || '00:00') + ':00');
+    if (isNaN(dt.getTime())) return Engine.faDate(m.date);
+    const diff = dt - now;
+    if (m.date === Engine.todayISO()) {
+      if (!m.time) return 'امروز برگزار می‌شود ☀️';
+      if (diff <= 0) return 'نزدیک شروع! 🔥';
+      const h = Math.floor(diff / 3600000), min = Math.max(1, Math.round((diff % 3600000) / 60000));
+      return h > 0 ? 'امروز، ' + Engine.faNum(h) + ' ساعت و ' + Engine.faNum(min) + ' دقیقه دیگر ⏳'
+        : Engine.faNum(min) + ' دقیقه دیگر ⏳';
+    }
+    if (diff < 0) return Engine.faDate(m.date);
+    const d = Math.floor(diff / 86400000);
+    if (d <= 0) return 'به‌زودی 🔜';
+    if (d === 1) return 'فردا' + (m.time ? ' ساعت ' + m.time : ' 📌');
+    try {
+      const wd = dt.toLocaleDateString('fa-IR', { weekday: 'long' });
+      if (d < 7) return Engine.faNum(d) + ' روز دیگر (' + wd + ')';
+    } catch (e) {}
+    return Engine.faDate(m.date);
+  }
 
   /* شمارش صعودی اعداد */
   function countUp() {
@@ -212,14 +239,34 @@ const UI = (() => {
     requestAnimationFrame(frame);
   }
 
+  /* کامپوننت واحد کارت بازی (scorecell): همه لیست‌ها */
+  function teamDot(t, id) {
+    const tm = id && id !== 'BYE' ? teamById(t, id) : null;
+    return '<i class="tdot" style="background:' + ((tm && tm.color) || '#94a3b8') + '"></i>';
+  }
+  function statusPill(t, m) {
+    if (m.status === 'done') return '<span class="pill done"><i></i>تمام‌شده</span>';
+    if (m.date === todayISO()) return '<span class="pill today"><i></i>امروز</span>';
+    return '<span class="pill soon"><i></i>زمان‌بندی‌شده</span>';
+  }
+  function todayISO() { return Engine.todayISO(); }
+  function scorersLine(t, m) {
+    if (!Array.isArray(m.scorers) || !m.scorers.length) return '';
+    const top = [...m.scorers].sort((a, b) => (b.goals || 0) - (a.goals || 0)).slice(0, 3);
+    return '<div class="scorers">⚽ ' + top.map(s => esc(s.name) + (s.goals > 1 ? ' ' + Engine.faNum(s.goals) : '')).join('، ') + '</div>';
+  }
   function matchRow(t, m, rt) {
     const a = Engine.teamName(t, m.a), b = Engine.teamName(t, m.b);
     const w = m.status === 'done' && m.result ? m.result.winner : null;
+    const num = Engine.matchNumber(t, m.id);
     return '<div class="match-row' + (m.status === 'done' ? ' done' : '') + '" onclick="UI.openMatchDialog(\'' + m.id + '\')">' +
-      '<div class="teams"><span class="' + (w === m.a ? 'winner' : '') + '">' + esc(a) + '</span>' +
+      '<div class="sc-top">' + statusPill(t, m) +
+      '<span class="sc-num">' + (num ? 'بازی ' + Engine.faNum(num) + ' • ' : '') + esc(rt || '') + '</span></div>' +
+      '<div class="teams"><span class="tname' + (w === m.a ? ' winner' : '') + '">' + teamDot(t, m.a) + esc(a) + '</span>' +
       '<span class="score">' + scoreShort(t, m) + '</span>' +
-      '<span class="' + (w === m.b ? 'winner' : '') + '">' + esc(b) + '</span></div>' +
-      '<div class="meta"><span>' + esc(rt || '') + '</span><span>' + esc(metaLine(t, m)) + '</span></div></div>';
+      '<span class="tname' + (w === m.b ? ' winner' : '') + '">' + esc(b) + teamDot(t, m.b) + '</span></div>' +
+      scorersLine(t, m) +
+      '<div class="meta"><span>' + esc(metaLine(t, m)) + '</span></div></div>';
   }
   function scoreShort(t, m) {
     if (m.status !== 'done' || !m.result) return '–';
@@ -233,8 +280,6 @@ const UI = (() => {
   }
   function metaLine(t, m) {
     const parts = [];
-    const num = Engine.matchNumber(t, m.id);
-    if (num) parts.push('بازی ' + Engine.faNum(num));
     if (m.date) parts.push(Engine.faDate(m.date));
     if (m.time) parts.push(m.time);
     if (m.place) parts.push(m.place);
@@ -312,7 +357,15 @@ const UI = (() => {
     else mid = '<div class="bm-vs">' + Export.scoreText(t, m) + '</div>';
     return '<div class="bmatch' + (m.status === 'done' ? ' done' : '') + '" onclick="UI.openMatchDialog(\'' + m.id + '\')">' +
       side(m.a, ds.a) + mid + side(m.b, ds.b) +
-      '<div class="bm-info">' + esc(metaLine(t, m)) + (m.locked ? ' 🔒' : '') + '</div></div>';
+      '<div class="bm-info">بازی ' + Engine.faNum(Engine.matchNumber(t, m.id)) + ' • ' + esc(metaLine(t, m)) + (m.locked ? ' 🔒' : '') + '</div></div>';
+  }
+
+  /* empty state احساسی با اکشن مستقیم */
+  function emptyState(icon, title, sub, btn, act) {
+    return '<div class="empty"><div class="empty-icon">' + icon + '</div>' +
+      '<div class="empty-title">' + title + '</div>' +
+      (sub ? '<p>' + sub + '</p>' : '') +
+      (btn ? '<button class="btn primary" onclick="' + act + '">' + btn + '</button>' : '') + '</div>';
   }
 
   /* ---------- تیم‌ها ---------- */
@@ -330,7 +383,8 @@ const UI = (() => {
         (r ? r.won + ' برد - ' + r.lost + ' باخت' : 'بدون بازی') + '</div></div>' +
         '<div class="acts"><button class="mini" onclick="UI.openTeamDialog(\'' + tm.id + '\')">✏️</button>' +
         '<button class="mini" onclick="UI.removeTeam(\'' + tm.id + '\')">🗑️</button></div></div>';
-    }).join('') : (q ? '<p>موردی یافت نشد.</p>' : '<div class="empty"><p>تیمی ثبت نشده.</p><button class="btn primary" onclick="UI.openTeamDialog()">＋ افزودن تیم</button></div>');
+    }).join('') : (q ? '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">چیزی پیدا نشد</div><p>اسم دیگری را امتحان کن</p></div>'
+      : emptyState('👥', 'هنوز تیمی ثبت نشده', 'اسامی تیم‌ها را اضافه کن تا بریم سر قرعه‌کشی 🎲', '＋ افزودن تیم', 'UI.openTeamDialog()'));
   }
   function removeTeam(id) {
     const t = Store.active(); if (!t) return;
@@ -352,7 +406,7 @@ const UI = (() => {
   /* ---------- مسابقات ---------- */
   function renderMatches() {
     const t = Store.active();
-    if (!t || !t.rounds.length) { $('matchesList').innerHTML = '<div class="empty"><p>جدولی وجود ندارد.</p></div>'; return; }
+    if (!t || !t.rounds.length) { $('matchesList').innerHTML = emptyState('📋', 'بازی‌ای اینجا نیست', 'اول قرعه‌کشی کن تا بازی‌ها ساخته شوند ✨', '🎲 قرعه‌کشی', 'UI.openDrawDialog()'); return; }
     const f = $('matchFilter').value;
     const q2 = (($('matchSearch') && $('matchSearch').value) || '').trim();
     let lastRt = '';
@@ -363,14 +417,14 @@ const UI = (() => {
         const h = x.roundTitle !== lastRt ? '<h3>' + esc(x.roundTitle) + '</h3>' : '';
         lastRt = x.roundTitle;
         return h + matchRow(t, x.m, x.roundTitle);
-      }).join('') || '<p>موردی نیست.</p>';
+      }).join('') || '<p style="color:var(--muted)">بازی‌ای با این فیلتر نیست 🔍</p>';
   }
 
   /* ---------- آمار ---------- */
   function renderStats() {
     const t = Store.active();
     const box = $('statsContent');
-    if (!t || !t.rounds.length) { box.innerHTML = '<div class="empty"><p>پس از قرعه‌کشی آمار نمایش داده می‌شود.</p></div>'; return; }
+    if (!t || !t.rounds.length) { box.innerHTML = emptyState('📊', 'هنوز آماری نیست', 'بعد از قرعه‌کشی، قهرمان و گلزنان را اینجا می‌بینی 👀', '🎲 قرعه‌کشی', 'UI.openDrawDialog()'); return; }
     const champ = t.champion ? teamById(t, t.champion) : null;
     if (champ && !t.celebrated) {
       t.celebrated = true;
@@ -390,7 +444,7 @@ const UI = (() => {
       mvpBoard.map(p => '<tr><td>⭐ ' + esc(p.name) + '</td><td>' + esc(Engine.teamName(t, p.team)) + '</td><td>' + Engine.faNum(p.awards) + '</td>' + (primaryLbl ? '<td>' + Engine.faNum(p.main) + '</td>' : '') + '</tr>').join('') + '</table>' : '';
     box.innerHTML =
       '<div class="view-head"><h3>آمار تورنمنت</h3><div><button class="btn small" onclick="Export.pngStats()">🖼️ عکس آمار</button></div></div>' +
-      (champ ? '<div class="champ"><div class="t">🏆 قهرمان تورنمنت</div><div class="n">' + esc(champ.name) + '</div></div>' : '') +
+      (champ ? '<div class="champ"><div class="t">🏆 قهرمان تورنمنت</div><div class="n">' + esc(champ.name) + '</div></div>' + champPathHtml(t) : '') +
       '<h3>رده‌بندی نهایی</h3>' + rank.map((r, i) => {
         const rtm = teamById(t, r.id);
         return '<div class="rank-row" style="--tc:' + ((rtm && rtm.color) || '#94a3b8') + '"><span class="pos">' + Engine.faNum(i + 1) + '</span>' +
@@ -403,6 +457,18 @@ const UI = (() => {
       '<h3>بازی جوانمردانه</h3><table class="stats"><tr><th>تیم</th><th>🟨</th><th>🟥</th><th>امتیاز منفی</th></tr>' +
       fair.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.y) + '</td><td>' + Engine.faNum(r.r) +
         '</td><td>' + Engine.faNum(r.fair) + '</td></tr>').join('') + '</table>' + mvpHtml + scorersHtml(t);
+  }
+
+  /* تایم‌لاین مسیر قهرمان تا جام */
+  function champPathHtml(t) {
+    const path = Engine.championPath(t);
+    if (!path.length) return '';
+    return '<div class="timeline">' +
+      path.map((p, i) =>
+        '<div class="tl-row"><span class="tl-dot">' + (i === path.length - 1 ? '🏆' : '✅') + '</span>' +
+        '<div class="tl-body"><div class="tl-title">' + esc(p.roundTitle) + '</div>' +
+        '<div class="tl-sub">برد ' + Export.scoreText(t, p.m) + ' مقابل ' + esc(Engine.teamName(t, p.opp)) + '</div></div></div>'
+      ).join('') + '</div>';
   }
 
   /* جدول گلزنان و پاسورها (فوتبال/فوتسال) */

@@ -1,4 +1,4 @@
-/* موتور تک‌حذفی فوق‌حرفه‌ای:
+﻿/* موتور تک‌حذفی فوق‌حرفه‌ای:
    سیدبندی استاندارد/حرفه‌ای/ترتیبی، BYE هوشمند، سری Best-of،
    وقت اضافه و پنالتی، رتبه‌بندی نهایی، بازی جوانمردانه */
 const Engine = (() => {
@@ -130,7 +130,7 @@ const Engine = (() => {
   function generateBracket(t, method) {
     const ordered = orderTeams(t, method === 'pro' ? 'ranked' : method);
     const n = ordered.length;
-    if (n < 2) { alert('حداقل ۲ تیم لازم است.'); return false; }
+    if (n < 2) { alert('برای شروع، حداقل ۲ تیم لازم است 🌱'); return false; }
     if (n > 64) { alert('حداکثر ۶۴ تیم.'); return false; }
     const slots = nextPow2(n);
     const ids = ordered.map(x => x.id);
@@ -236,8 +236,8 @@ const Engine = (() => {
   function setResult(t, matchId, d) {
     const m = findMatch(t, matchId);
     if (!m) return false;
-    if (m.locked) { alert('این بازی قفل شده است.'); return false; }
-    if (!m.a || !m.b || m.a === 'BYE' || m.b === 'BYE') { alert('هر دو تیم مشخص نیستند.'); return false; }
+    if (m.locked) { alert('🔒 این بازی قفل است؛ اول قفلش را باز کن'); return false; }
+    if (!m.a || !m.b || m.a === 'BYE' || m.b === 'BYE') { alert('صبر کن! هر دو تیم این بازی هنوز مشخص نشده‌اند ⏳'); return false; }
     const series = t.settings.series || 1;
     const nv = { scoreA: null, scoreB: null, etA: null, etB: null, penA: null, penB: null, games: [], seriesWins: null };
     let winner = null, loser = null;
@@ -253,7 +253,7 @@ const Engine = (() => {
         winner = r.winner === 'a' ? m.a : m.b;
       } else if (t.settings.scoring === 'goals') {
         const a = num(d.scoreA), b = num(d.scoreB);
-        if (a === null || b === null) { alert('نتیجه ۹۰ دقیقه را وارد کن.'); return false; }
+        if (a === null || b === null) { alert('اول نتیجه ۹۰ دقیقه را بنویس ✍️'); return false; }
         nv.scoreA = a; nv.scoreB = b;
         if (a !== b) winner = a > b ? m.a : m.b;
         else {
@@ -265,20 +265,20 @@ const Engine = (() => {
           if (ta !== tb) winner = ta > tb ? m.a : m.b;
           else {
             const pa = num(d.penA), pb = num(d.penB);
-            if (pa === null || pb === null) { alert('بازی مساوی است؛ نتیجه پنالتی لازم است.'); return false; }
-            if (pa === pb) { alert('پنالتی نمی‌تواند مساوی باشد.'); return false; }
+            if (pa === null || pb === null) { alert('مساوی شد! قهرمان را با پنالتی مشخص کن 🥅'); return false; }
+            if (pa === pb) { alert('پنالتی‌ها هم مساوی شدند؟! یکی را بیشتر بنویس 😄'); return false; }
             nv.penA = pa; nv.penB = pb;
             winner = pa > pb ? m.a : m.b;
           }
         }
       } else {
         const a = num(d.scoreA), b = num(d.scoreB);
-        if (a === null || b === null) { alert('نتیجه معتبر وارد کن.'); return false; }
+        if (a === null || b === null) { alert('این نتیجه درست به نظر نمی‌رسد؛ دوباره بنویس ✍️'); return false; }
         nv.scoreA = a; nv.scoreB = b;
         if (a === b) {
           const pa = num(d.penA), pb = num(d.penB);
-          if (pa === null || pb === null) { alert('بازی مساوی است؛ نتیجه پنالتی لازم است.'); return false; }
-          if (pa === pb) { alert('پنالتی نمی‌تواند مساوی باشد.'); return false; }
+          if (pa === null || pb === null) { alert('مساوی شد! قهرمان را با پنالتی مشخص کن 🥅'); return false; }
+          if (pa === pb) { alert('پنالتی‌ها هم مساوی شدند؟! یکی را بیشتر بنویس 😄'); return false; }
           nv.penA = pa; nv.penB = pb;
           winner = pa > pb ? m.a : m.b;
         } else winner = a > b ? m.a : m.b;
@@ -286,7 +286,7 @@ const Engine = (() => {
       loser = winner === m.a ? m.b : m.a;
     } else {
       winner = d.winner;
-      if (winner !== m.a && winner !== m.b) { alert('برنده نامعتبر است.'); return false; }
+      if (winner !== m.a && winner !== m.b) { alert('تیم صعودکننده را درست انتخاب کن 👀'); return false; }
       loser = winner === m.a ? m.b : m.a;
     }
     // اگر نتیجه قبلی بود، اول اثراتش را از بازی‌های بعدی پاک کن
@@ -547,6 +547,19 @@ const Engine = (() => {
     }).sort((a, b) => b.goals - a.goals || b.assists - a.assists || a.name.localeCompare(b.name, 'fa'));
   }
 
+  /* مسیر قهرمان تا جام: بردهای تیم قهرمان به ترتیب مرحله */
+  function championPath(t) {
+    if (!t.champion) return [];
+    const out = [];
+    for (const x of allMatches(t)) {
+      const m = x.m;
+      if (m.id === 'third' || !m.result || m.result.type === 'bye') continue;
+      if (m.result.winner !== t.champion) continue;
+      out.push({ roundTitle: x.roundTitle, m, opp: m.result.loser });
+    }
+    return out;
+  }
+
   function todayISO() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -563,6 +576,6 @@ const Engine = (() => {
     nextPow2, roundTitle, generateBracket, findMatch, teamName,
     setResult, clearResult, setSchedule, resetBracket, swapTeams,
     allMatches, matchNumber, record, finalRank, fairPoints, totals, displayScore,
-    matchWinner, mvpName, mvpStatsLine, tournamentMvp, scorersTable, todayISO, faDate, faNum
+    matchWinner, mvpName, mvpStatsLine, tournamentMvp, scorersTable, championPath, todayISO, faDate, faNum
   };
 })();
