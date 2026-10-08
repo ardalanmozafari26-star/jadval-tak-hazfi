@@ -23,8 +23,8 @@
     <div id="tournamentName" class="appbar-title">—</div>
     <div id="tournamentMeta" class="appbar-sub">—</div>
   </div>
-  <button id="newTournamentBtn" class="icon-btn" aria-label="تورنمنت جدید">＋</button>
 </header>
+<div id="ptr" class="hidden">⟳ رها کن برای تازه‌سازی</div>
 
 <aside id="drawer" class="drawer">
   <div class="drawer-head">
@@ -93,6 +93,7 @@
         <button class="btn small primary" onclick="UI.openTeamDialog()">＋ افزودن</button>
       </div>
     </div>
+    <div class="search-row"><input id="teamSearch" placeholder="🔍 جستجوی تیم..." oninput="UI.renderTeams()"></div>
     <div id="teamsList"></div>
   </section>
 
@@ -109,6 +110,7 @@
       </select>
       </div>
     </div>
+    <div class="search-row"><input id="matchSearch" placeholder="🔍 جستجوی بازی (نام تیم...)" oninput="UI.renderMatches()"></div>
     <div id="matchesList"></div>
   </section>
 
@@ -175,6 +177,7 @@
 </main>
 
 <nav id="tabbar">
+  <i id="tabInd"></i>
   <button data-view="home" class="active">🏠<span>خانه</span></button>
   <button data-view="bracket">🏆<span>جدول</span></button>
   <button data-view="teams">👥<span>تیم‌ها</span></button>
@@ -182,6 +185,9 @@
   <button data-view="stats">📊<span>آمار</span></button>
   <button data-view="settings">⚙️<span>تنظیمات</span></button>
 </nav>
+
+<!-- دکمه شناور اکشن اصلی هر تب -->
+<button id="fab" class="hidden" aria-label="اکشن سریع">＋</button>
 
 <!-- دیالوگ عمومی -->
 <div id="modalOverlay" class="overlay hidden">

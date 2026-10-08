@@ -47,13 +47,47 @@ const UI = (() => {
     });
   }
 
-  /* ---------- نویگیشن ---------- */
+  /* ---------- نویگیشن شستی ---------- */
+  function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms || 15); } catch (e) {} }
+
+  const FABS = {
+    home: { icon: '＋', fn: () => UI.openTournamentDialog() },
+    bracket: { icon: '🎲', fn: () => UI.openDrawDialog() },
+    teams: { icon: '＋', fn: () => UI.openTeamDialog() },
+    matches: { icon: '🖼️', fn: () => Export.pngMatches() },
+    stats: { icon: '🖼️', fn: () => Export.pngStats() },
+    settings: null
+  };
+  function updateFab() {
+    const fab = $('fab');
+    if (!fab) return;
+    const cfg = FABS[view];
+    if (!cfg) { fab.classList.add('hidden'); return; }
+    fab.classList.remove('hidden');
+    if (fab.textContent !== cfg.icon) {
+      fab.textContent = cfg.icon;
+      fab.classList.remove('pop'); void fab.offsetWidth; fab.classList.add('pop');
+    }
+    fab.onclick = () => { buzz(15); cfg.fn(); };
+  }
+  function moveTabInd() {
+    const bar = $('tabbar'), ind = $('tabInd');
+    if (!bar || !ind) return;
+    const btn = bar.querySelector('button.active');
+    if (!btn) return;
+    const br = bar.getBoundingClientRect(), r = btn.getBoundingClientRect();
+    ind.style.width = Math.max(0, r.width - 8) + 'px';
+    ind.style.right = (br.right - r.right + 4) + 'px';
+  }
+
   function switchView(v) {
     view = v;
     document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
     document.querySelectorAll('.view').forEach(s => s.classList.add('hidden'));
     $('view-' + v).classList.remove('hidden');
     render();
+    updateFab();
+    requestAnimationFrame(moveTabInd);
   }
 
   function render() {
@@ -206,9 +240,6 @@ const UI = (() => {
     if (m.place) parts.push(m.place);
     if (m.status === 'done' && m.result && m.result.type === 'score') {
     const c = m.cards || {};
-    const showScorers = (t.sport === 'football' || t.sport === 'futsal' || t.settings.scoring === 'goals') && series === 1 && canPlay;
-    UI._scorers = Array.isArray(m.scorers) ? JSON.parse(JSON.stringify(m.scorers)) : [];
-    UI._scCtx = { a: m.a, b: m.b, aN, bN };
       const tot = (c.ya || 0) + (c.yb || 0) + (c.ra || 0) + (c.rb || 0);
       if (tot) parts.push('🟨' + Engine.faNum((c.ya || 0) + (c.yb || 0)) + ' 🟥' + Engine.faNum((c.ra || 0) + (c.rb || 0)));
       const mn = Engine.mvpName(m);
@@ -289,20 +320,33 @@ const UI = (() => {
     const t = Store.active();
     if (!t) { $('teamsList').innerHTML = '<p>تورنمنتی انتخاب نشده.</p>'; return; }
     $('teamsCount').textContent = 'تیم‌ها (' + Engine.faNum(t.teams.length) + ')';
-    $('teamsList').innerHTML = t.teams.length ? t.teams.map(tm => {
+    const q = (($('teamSearch') && $('teamSearch').value) || '').trim();
+    const list = t.teams.filter(tm => !q || tm.name.includes(q) || (tm.coach || '').includes(q));
+    $('teamsList').innerHTML = list.length ? list.map(tm => {
       const r = t.rounds.length ? Engine.record(t, tm.id) : null;
-      return '<div class="team-row" style="--tc:' + (tm.color || '#94a3b8') + '">' + avatar(tm) +
+      return '<div class="team-row" data-tm="' + tm.id + '" style="--tc:' + (tm.color || '#94a3b8') + '">' + avatar(tm) +
         '<div class="info"><div class="n">' + esc(tm.name) + '</div><div class="m">' +
         (tm.coach ? 'مربی: ' + esc(tm.coach) + ' • ' : '') + (tm.rank ? 'سید ' + Engine.faNum(tm.rank) + ' • ' : '') +
         (r ? r.won + ' برد - ' + r.lost + ' باخت' : 'بدون بازی') + '</div></div>' +
         '<div class="acts"><button class="mini" onclick="UI.openTeamDialog(\'' + tm.id + '\')">✏️</button>' +
         '<button class="mini" onclick="UI.removeTeam(\'' + tm.id + '\')">🗑️</button></div></div>';
-    }).join('') : '<div class="empty"><p>تیمی ثبت نشده.</p><button class="btn primary" onclick="UI.openTeamDialog()">＋ افزودن تیم</button></div>';
+    }).join('') : (q ? '<p>موردی یافت نشد.</p>' : '<div class="empty"><p>تیمی ثبت نشده.</p><button class="btn primary" onclick="UI.openTeamDialog()">＋ افزودن تیم</button></div>');
   }
   function removeTeam(id) {
     const t = Store.active(); if (!t) return;
     if (!confirm('تیم حذف شود؟')) return;
+    closeModal();
     Store.removeTeam(t.id, id); render();
+  }
+  /* منوی سریع لانگ‌پرس روی تیم */
+  function openQuickMenu(teamId) {
+    const t = Store.active(); if (!t) return;
+    const tm = teamById(t, teamId); if (!tm) return;
+    openModal('<div class="quick-menu"><div class="q-name">' + esc(tm.name) + '</div>' +
+      '<div class="q-sub">' + esc((tm.coach ? 'مربی: ' + tm.coach + ' • ' : '') + (tm.rank ? 'سید ' + Engine.faNum(tm.rank) : 'بدون سید')) + '</div>' +
+      '<div class="modal-btns"><button class="btn primary" onclick="UI.closeModal();UI.openTeamDialog(\'' + tm.id + '\')">✏️ ویرایش</button>' +
+      '<button class="btn danger" onclick="UI.removeTeam(\'' + tm.id + '\')">🗑️ حذف</button></div>' +
+      '<div class="modal-btns"><button class="btn" onclick="UI.closeModal()">بستن</button></div></div>');
   }
 
   /* ---------- مسابقات ---------- */
@@ -310,9 +354,11 @@ const UI = (() => {
     const t = Store.active();
     if (!t || !t.rounds.length) { $('matchesList').innerHTML = '<div class="empty"><p>جدولی وجود ندارد.</p></div>'; return; }
     const f = $('matchFilter').value;
+    const q2 = (($('matchSearch') && $('matchSearch').value) || '').trim();
     let lastRt = '';
     $('matchesList').innerHTML = Engine.allMatches(t)
-      .filter(x => f === 'all' || x.m.status === f)
+      .filter(x => (f === 'all' || x.m.status === f) &&
+        (!q2 || Engine.teamName(t, x.m.a).includes(q2) || Engine.teamName(t, x.m.b).includes(q2)))
       .map(x => {
         const h = x.roundTitle !== lastRt ? '<h3>' + esc(x.roundTitle) + '</h3>' : '';
         lastRt = x.roundTitle;
@@ -428,7 +474,86 @@ const UI = (() => {
 
   /* ---------- مودال ---------- */
   function openModal(html) { $('modal').innerHTML = html; $('modalOverlay').classList.remove('hidden'); }
-  function closeModal() { $('modalOverlay').classList.add('hidden'); }
+  function closeModal() {
+    $('modalOverlay').classList.add('hidden');
+    const m = $('modal');
+    if (m) m.style.transform = '';
+  }
+
+  /* ---------- موتور ژست‌ها (بدون کتابخانه) ---------- */
+  function initGestures() {
+    const modal = $('modal'), views = $('views'), ptr = $('ptr');
+
+    /* ۱. درگ شیت به پایین برای بستن */
+    let sy = 0, dy = 0, dragging = false;
+    modal.addEventListener('touchstart', e => {
+      if (modal.scrollTop <= 0) { sy = e.touches[0].clientY; dragging = true; dy = 0; }
+    }, { passive: true });
+    modal.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      dy = e.touches[0].clientY - sy;
+      if (dy > 0) { modal.style.transform = 'translateY(' + Math.min(dy, 220) + 'px)'; modal.classList.add('dragging'); }
+    }, { passive: true });
+    const endSheet = () => {
+      if (!dragging) return;
+      dragging = false;
+      modal.classList.remove('dragging');
+      modal.style.transform = '';
+      if (dy > 120) closeModal();
+      dy = 0;
+    };
+    modal.addEventListener('touchend', endSheet);
+    modal.addEventListener('touchcancel', endSheet);
+
+    /* ۲. سوایپ روی کارت بازی + ۳. لانگ‌پرس روی تیم */
+    let tx = 0, ty = 0, tEl = null, lpTimer = null, lpFired = false;
+    document.addEventListener('touchstart', e => {
+      tEl = e.target.closest('.match-row') || null;
+      lpFired = false;
+      if (tEl) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }
+      const tm = e.target.closest('.team-row');
+      if (tm && tm.dataset.tm && !e.target.closest('button')) {
+        const id = tm.dataset.tm;
+        lpTimer = setTimeout(() => { lpFired = true; buzz(30); openQuickMenu(id); }, 550);
+      }
+    }, { passive: true });
+    document.addEventListener('touchmove', e => {
+      if (tEl) {
+        const dx = e.touches[0].clientX - tx, dyy = e.touches[0].clientY - ty;
+        if (Math.abs(dx) > 12 || Math.abs(dyy) > 12) clearTimeout(lpTimer);
+      } else clearTimeout(lpTimer);
+    }, { passive: true });
+    document.addEventListener('touchend', e => {
+      clearTimeout(lpTimer);
+      if (tEl && !lpFired && e.changedTouches.length) {
+        const dx = e.changedTouches[0].clientX - tx, dyy = e.changedTouches[0].clientY - ty;
+        if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dyy) * 1.4) tEl.click();
+      }
+      tEl = null;
+    }, { passive: true });
+
+    /* ۴. پول‌تو‌ریفش */
+    let py = 0, pulling = false;
+    views.addEventListener('touchstart', e => {
+      if (views.scrollTop <= 0) { py = e.touches[0].clientY; pulling = true; }
+    }, { passive: true });
+    views.addEventListener('touchmove', e => {
+      if (!pulling || !ptr) return;
+      if (e.touches[0].clientY - py > 70) ptr.classList.remove('hidden');
+    }, { passive: true });
+    views.addEventListener('touchend', e => {
+      if (!pulling) return;
+      pulling = false;
+      if (ptr && !ptr.classList.contains('hidden')) {
+        ptr.classList.add('hidden');
+        const d = e.changedTouches.length ? e.changedTouches[0].clientY - py : 0;
+        if (d > 70) { buzz(20); render(); }
+      }
+    });
+    views.addEventListener('touchcancel', () => { pulling = false; if (ptr) ptr.classList.add('hidden'); });
+
+    window.addEventListener('resize', () => moveTabInd());
+  }
 
   function openTournamentDialog(edit) {
     const t = edit ? Store.active() : null;
@@ -578,7 +703,7 @@ const UI = (() => {
       t.teams.sort((a, b) => manualOrder.indexOf(a.id) - manualOrder.indexOf(b.id));
     }
     t.settings.byeTo = $('draw_bye').value;
-    if (Engine.generateBracket(t, drawMethod)) { closeModal(); switchView('bracket'); }
+    if (Engine.generateBracket(t, drawMethod)) { buzz(25); closeModal(); switchView('bracket'); }
   }
 
   function openSwapDialog() {
@@ -798,7 +923,7 @@ const UI = (() => {
       if (UI._matchPhoto !== undefined && UI._matchPhoto !== null) d.photo = UI._matchPhoto;
     } else d.winner = $('mt_w').value;
     d.note = $('mt_note').value;
-    if (Engine.setResult(t, id, d)) { UI._matchPhoto = null; closeModal(); render(); }
+    if (Engine.setResult(t, id, d)) { UI._matchPhoto = null; buzz(25); closeModal(); render(); }
   }
   function clearMatch(id) {
     const t = Store.active();
@@ -821,6 +946,7 @@ const UI = (() => {
     openSwapDialog, doSwap,
     openMatchDialog, matchTypeToggle, saveMatchResult, saveMatchSchedule, clearMatch, toggleLock,
     onPhotoInput, clearMatchPhoto, pickColor, applyBrand,
+    buzz, updateFab, moveTabInd, initGestures, openQuickMenu,
     addScorerRow, delScorerRow, syncScorer, renderScorerRows,
     zoom, zoomReset, saveTournamentSettings, saveAppSettings,
     resetBracket, deleteTournament, duplicateTournament,
