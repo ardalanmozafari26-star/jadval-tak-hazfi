@@ -1,5 +1,5 @@
 node_modules/
 android/app/build/
 android/.gradle/
+apk/
 *.log
-C:\Users\ardalan\AppData\Local\Temp\opencode/

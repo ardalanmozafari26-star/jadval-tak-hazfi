@@ -193,7 +193,10 @@ const UI = (() => {
     if (m.time) parts.push(m.time);
     if (m.place) parts.push(m.place);
     if (m.status === 'done' && m.result && m.result.type === 'score') {
-      const c = m.cards || {};
+    const c = m.cards || {};
+    const showScorers = (t.sport === 'football' || t.sport === 'futsal' || t.settings.scoring === 'goals') && series === 1 && canPlay;
+    UI._scorers = Array.isArray(m.scorers) ? JSON.parse(JSON.stringify(m.scorers)) : [];
+    UI._scCtx = { a: m.a, b: m.b, aN, bN };
       const tot = (c.ya || 0) + (c.yb || 0) + (c.ra || 0) + (c.rb || 0);
       if (tot) parts.push('🟨' + Engine.faNum((c.ya || 0) + (c.yb || 0)) + ' 🟥' + Engine.faNum((c.ra || 0) + (c.rb || 0)));
       const mn = Engine.mvpName(m);
@@ -340,7 +343,23 @@ const UI = (() => {
         '</td><td>' + Engine.faNum(r.gf - r.ga) + '</td></tr>').join('') + '</table>' +
       '<h3>بازی جوانمردانه</h3><table class="stats"><tr><th>تیم</th><th>🟨</th><th>🟥</th><th>امتیاز منفی</th></tr>' +
       fair.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.y) + '</td><td>' + Engine.faNum(r.r) +
-        '</td><td>' + Engine.faNum(r.fair) + '</td></tr>').join('') + '</table>' + mvpHtml;
+        '</td><td>' + Engine.faNum(r.fair) + '</td></tr>').join('') + '</table>' + mvpHtml + scorersHtml(t);
+  }
+
+  /* جدول گلزنان و پاسورها (فوتبال/فوتسال) */
+  function scorersHtml(t) {
+    const tab = Engine.scorersTable(t);
+    if (!tab.length) {
+      if (t.sport !== 'football' && t.sport !== 'futsal' && t.settings.scoring !== 'goals') return '';
+      return '<h3>⚽ گلزنان و پاسورها</h3><p style="color:var(--muted)">هنوز گلی ثبت نشده. از کارت هر بازی، گلزن‌ها را اضافه کن.</p>';
+    }
+    const top = tab[0];
+    return '<h3>⚽ گلزنان برتر</h3>' +
+      '<div class="champ"><div class="t">👟 آقای گل</div><div class="n">' + esc(top.name) + '</div>' +
+      '<div class="t">' + esc(Engine.teamName(t, top.team)) + ' • ' + Engine.faNum(top.goals) + ' گل' + (top.assists ? ' • ' + Engine.faNum(top.assists) + ' پاس گل' : '') + '</div></div>' +
+      '<table class="stats"><tr><th>#</th><th>بازیکن</th><th>تیم</th><th>⚽ گل</th><th>🅰️ پاس</th><th>بازی</th></tr>' +
+      tab.map((p, i) => '<tr><td>' + Engine.faNum(i + 1) + '</td><td>' + esc(p.name) + '</td><td>' + esc(Engine.teamName(t, p.team)) +
+        '</td><td><strong>' + Engine.faNum(p.goals) + '</strong></td><td>' + Engine.faNum(p.assists) + '</td><td>' + Engine.faNum(p.played) + '</td></tr>').join('') + '</table>';
   }
 
   /* ---------- تنظیمات ---------- */
@@ -631,6 +650,9 @@ const UI = (() => {
       (canPlay ? '<option value="' + m.a + '"' + (mv.team === m.a ? ' selected' : '') + '>' + esc(aN) + '</option><option value="' + m.b + '"' + (mv.team === m.b ? ' selected' : '') + '>' + esc(bN) + '</option>' : '') +
       '</select></div>' +
       '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">' + mvpStatHtml + '</div></div>') +
+      (showScorers ? '<div class="field"><label>⚽ گلزن‌ها و پاسورها</label><div id="scorerList"></div>' +
+      '<button class="btn small" type="button" onclick="UI.addScorerRow()">＋ افزودن بازیکن</button>' +
+      '<div id="scorerWarn" style="font-size:12px;color:var(--muted);margin-top:4px"></div></div>' : '') +
       '<div class="field"><label>توضیحات</label><input id="mt_note" value="' + esc(m.result ? m.result.note || '' : '') + '"></div>' +
       '<div class="field"><label>📎 ضمیمه (عکس سند نتیجه)</label><input type="file" id="mt_photo" accept="image/*" onchange="UI.onPhotoInput(this,\'mt_prev\',\'_matchPhoto\')">' +
       '<img id="mt_prev" class="photo-prev' + (UI._matchPhoto ? '' : ' hidden') + '" src="' + (UI._matchPhoto || '') + '">' +
@@ -648,11 +670,66 @@ const UI = (() => {
       '<button class="btn small" onclick="Export.pngMatch(\'' + m.id + '\')">🖼️</button>' +
       '<button class="btn small" onclick="UI.toggleLock(\'' + m.id + '\')">' + (m.locked ? '🔓 باز کردن' : '🔒 قفل') + '</button>' +
       '<button class="btn small" onclick="UI.closeModal()">بستن</button></div>');
+    if (showScorers) renderScorerRows();
   }
   function clearMatchPhoto() {
     UI._matchPhoto = '';
     const p = $('mt_prev');
     if (p) { p.src = ''; p.classList.add('hidden'); }
+  }
+  /* ---------- گلزن‌ها و پاسورها ---------- */
+  function scorerTeamOptions(sel) {
+    const ctx = UI._scCtx || {};
+    const opt = (id, nm) => '<option value="' + id + '"' + (sel === id ? ' selected' : '') + '>' + esc(nm || '') + '</option>';
+    return opt(ctx.a, ctx.aN) + opt(ctx.b, ctx.bN);
+  }
+  function renderScorerRows() {
+    const box = $('scorerList');
+    if (!box) return;
+    const ctx = UI._scCtx || {};
+    box.innerHTML = (UI._scorers || []).map((s, i) =>
+      '<div class="game-row"><input value="' + esc(s.name || '') + '" placeholder="نام بازیکن" style="flex:2" oninput="UI.syncScorer(' + i + ',\'name\',this)">' +
+      '<select style="flex:1.4" onchange="UI.syncScorer(' + i + ',\'team\',this)">' + scorerTeamOptions(s.team) + '</select>' +
+      '<input type="number" min="0" style="width:52px" title="گل" placeholder="⚽" value="' + (s.goals || 0) + '" oninput="UI.syncScorer(' + i + ',\'goals\',this)">' +
+      '<input type="number" min="0" style="width:52px" title="پاس گل" placeholder="🅰️" value="' + (s.assists || 0) + '" oninput="UI.syncScorer(' + i + ',\'assists\',this)">' +
+      '<button class="mini" type="button" onclick="UI.delScorerRow(' + i + ')">🗑️</button></div>'
+    ).join('') || '<p style="font-size:12px;color:var(--muted)">هنوز ثبت نشده.</p>';
+    updateScorerWarn();
+  }
+  function updateScorerWarn() {
+    const w = $('scorerWarn');
+    if (!w) return;
+    const ctx = UI._scCtx || {};
+    // جمع گل‌های ثبت‌شده هر تیم در برابر نتیجه بازی
+    const m = { a: 0, b: 0 };
+    (UI._scorers || []).forEach(s => {
+      const g = parseInt(s.goals, 10) || 0;
+      if (s.team === ctx.a) m.a += g; else if (s.team === ctx.b) m.b += g;
+    });
+    const ta = ($('mt_a') && $('mt_a').value !== '' ? parseInt($('mt_a').value, 10) : null);
+    const tb = ($('mt_b') && $('mt_b').value !== '' ? parseInt($('mt_b').value, 10) : null);
+    const ea = ($('mt_ea') && $('mt_ea').value !== '' ? parseInt($('mt_ea').value, 10) : 0) || 0;
+    const eb = ($('mt_eb') && $('mt_eb').value !== '' ? parseInt($('mt_eb').value, 10) : 0) || 0;
+    const notes = [];
+    if (ta !== null && m.a > ta + ea) notes.push('گل‌های ' + (ctx.aN || '') + ' (' + Engine.faNum(m.a) + ') بیشتر از نتیجه (' + Engine.faNum(ta + ea) + ') است');
+    if (tb !== null && m.b > tb + eb) notes.push('گل‌های ' + (ctx.bN || '') + ' (' + Engine.faNum(m.b) + ') بیشتر از نتیجه (' + Engine.faNum(tb + eb) + ') است');
+    w.textContent = notes.join(' • ');
+    w.style.color = notes.length ? '#dc2626' : 'var(--muted)';
+  }
+  function addScorerRow() {
+    UI._scorers = UI._scorers || [];
+    const ctx = UI._scCtx || {};
+    UI._scorers.push({ name: '', team: ctx.a || null, goals: 1, assists: 0 });
+    renderScorerRows();
+  }
+  function delScorerRow(i) {
+    UI._scorers.splice(i, 1);
+    renderScorerRows();
+  }
+  function syncScorer(i, field, el) {
+    if (!UI._scorers || !UI._scorers[i]) return;
+    UI._scorers[i][field] = field === 'name' || field === 'team' ? el.value : (parseInt(el.value, 10) || 0);
+    if (field === 'goals') updateScorerWarn();
   }
   function matchTypeToggle() {
     const v = $('mt_type').value;
@@ -694,6 +771,7 @@ const UI = (() => {
         if (el) mvStats[s.key] = el.value;
       });
       d.mvp = { name: $('mt_mvp').value, team: $('mt_mvp_team').value, stats: mvStats };
+      d.scorers = (UI._scorers || []).filter(s => String(s.name || '').trim()).map(s => ({ name: s.name, team: s.team, goals: s.goals, assists: s.assists }));
       if (UI._matchPhoto !== undefined && UI._matchPhoto !== null) d.photo = UI._matchPhoto;
     } else d.winner = $('mt_w').value;
     d.note = $('mt_note').value;
@@ -720,6 +798,7 @@ const UI = (() => {
     openSwapDialog, doSwap,
     openMatchDialog, matchTypeToggle, saveMatchResult, saveMatchSchedule, clearMatch, toggleLock,
     onPhotoInput, clearMatchPhoto,
+    addScorerRow, delScorerRow, syncScorer, renderScorerRows,
     zoom, zoomReset, saveTournamentSettings, saveAppSettings,
     resetBracket, deleteTournament, duplicateTournament,
     closeModal, applyTheme

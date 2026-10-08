@@ -80,10 +80,7 @@ const Export = (() => {
       });
     });
 
-    const a = document.createElement('a');
-    a.download = t.name + '-bracket.png';
-    a.href = cv.toDataURL('image/png');
-    a.click();
+    shareOrDownload(cv.toDataURL('image/png'), t.name + '-bracket.png');
   }
 
   function drawSide(c, t, teamId, score, x, y, colW, isWin, bottom) {
@@ -172,26 +169,86 @@ const Export = (() => {
     shareOrDownload(cv.toDataURL('image/png'), filename);
   }
 
+  /* ---------- اشتراک‌گذاری نیتیو (اندروید) با فالبک وب ---------- */
+  function capPlugins() {
+    try {
+      if (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+        return window.Capacitor.Plugins || null;
+      }
+    } catch (e) {}
+    return null;
+  }
+  function textToBase64(text) {
+    try { return btoa(unescape(encodeURIComponent(text))); }
+    catch (e) {
+      let s = unescape(encodeURIComponent(text)), out = '';
+      for (let i = 0; i < s.length; i++) out += String.fromCharCode(s.charCodeAt(i) & 0xff);
+      return btoa(out);
+    }
+  }
+  function shareOrDownload(dataUrl, filename) {
+    const P = capPlugins();
+    if (P && P.Filesystem && P.Share) {
+      const base64 = dataUrl.split(',')[1];
+      P.Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' }).then(() =>
+        P.Filesystem.getUri({ path: filename, directory: 'CACHE' })
+      ).then(uri =>
+        P.Share.share({ title: filename, files: [uri.uri], dialogTitle: 'اشتراک‌گذاری عکس' })
+      ).catch(() => webDownload(dataUrl, filename));
+      return;
+    }
+    // فالبک وب: اشتراک‌گذاری مرورگر
+    try {
+      const file = new File([dataURLtoBlob(dataUrl)], filename, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        Promise.resolve(navigator.share({ files: [file], title: filename })).catch(() => {});
+        return;
+      }
+    } catch (e) {}
+    webDownload(dataUrl, filename);
+  }
   function dataURLtoBlob(url) {
-    const [head, data] = url.split(',');
-    const mime = head.match(/:(.*?);/)[1];
-    const bin = atob(data);
+    const parts = url.split(',');
+    const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/png';
+    const bin = atob(parts[1]);
     const arr = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
     return new Blob([arr], { type: mime });
   }
-  function shareOrDownload(dataUrl, filename) {
+  function webDownload(dataUrl, filename) {
     try {
-      const file = new File([dataURLtoBlob(dataUrl)], filename, { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: filename });
-        return;
-      }
-    } catch (e) {}
-    const a = document.createElement('a');
-    a.download = filename;
-    a.href = dataUrl;
-    a.click();
+      const a = document.createElement('a');
+      a.download = filename;
+      a.href = dataUrl;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) { alert('ذخیره عکس ممکن نشد.'); }
+  }
+  /* ذخیره/اشتراک فایل متنی (بکاپ، CSV) — روی اندروید هم کار می‌کند */
+  function shareTextFile(text, filename, mime) {
+    const P = capPlugins();
+    if (P && P.Filesystem && P.Share) {
+      P.Filesystem.writeFile({ path: filename, data: textToBase64(text), directory: 'CACHE' }).then(() =>
+        P.Filesystem.getUri({ path: filename, directory: 'CACHE' })
+      ).then(uri =>
+        P.Share.share({ title: filename, files: [uri.uri], dialogTitle: 'اشتراک‌گذاری فایل' })
+      ).catch(() => webTextDownload(text, filename, mime));
+      return;
+    }
+    webTextDownload(text, filename, mime);
+  }
+  function webTextDownload(text, filename, mime) {
+    try {
+      const blob = new Blob([text], { type: mime });
+      const a = document.createElement('a');
+      a.download = filename;
+      a.href = URL.createObjectURL(blob);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    } catch (e) { alert('ذخیره فایل ممکن نشد.'); }
   }
 
   function needT() {
@@ -205,10 +262,12 @@ const Export = (() => {
     const perf = t.teams.map(tm => Object.assign({ tm }, Engine.record(t, tm.id)))
       .sort((a, b) => b.won - a.won || (b.gf - b.ga) - (a.gf - a.ga));
     const mvps = Engine.tournamentMvp(t).slice(0, 5);
+    const sc = Engine.scorersTable(t).slice(0, 8);
     shot(t.name, 'آمار تورنمنت', [
       { head: 'رده‌بندی نهایی', rows: rank.map((r, i) => ({ main: Engine.teamName(t, r.id), sub: r.title, badge: (i + 1) + '' })) },
       { head: 'عملکرد تیم‌ها', rows: perf.map(r => ({ main: r.tm.name, sub: r.won + ' برد • ' + r.lost + ' باخت', badge: (r.gf - r.ga) + '' })) },
-      { head: 'ستارگان ⭐', rows: mvps.length ? mvps.map(p => ({ main: p.name, sub: Engine.teamName(t, p.team) + ' • ' + p.awards + ' بار', badge: p.main + '' })) : [{ main: '—', sub: '', badge: '' }] }
+      { head: 'ستارگان ⭐', rows: mvps.length ? mvps.map(p => ({ main: p.name, sub: Engine.teamName(t, p.team) + ' • ' + p.awards + ' بار', badge: p.main + '' })) : [{ main: '—', sub: '', badge: '' }] },
+      { head: '⚽ گلزنان برتر', rows: sc.length ? sc.map(p => ({ main: p.name, sub: Engine.teamName(t, p.team) + ' • ' + p.assists + ' پاس گل', badge: p.goals + ' گل' })) : [{ main: '—', sub: '', badge: '' }] }
     ], t.name + '-stats.png');
   }
   function pngTeams() {
@@ -246,6 +305,11 @@ const Export = (() => {
     if (m.ref) rows.push({ main: 'داور', sub: m.ref, badge: '' });
     const mn = Engine.mvpName(m);
     if (mn) rows.push({ main: '⭐ ' + mn, sub: Engine.mvpStatsLine(t, m), badge: '' });
+    if (Array.isArray(m.scorers) && m.scorers.length) {
+      m.scorers.forEach(s => {
+        rows.push({ main: '⚽ ' + s.name, sub: Engine.teamName(t, s.team) + ' • ' + (s.assists || 0) + ' پاس گل', badge: (s.goals || 0) + ' گل' });
+      });
+    }
     const c = m.cards || {};
     if ((c.ya || c.yb || c.ra || c.rb)) rows.push({ main: 'کارت‌ها', sub: '🟨' + ((c.ya || 0) + (c.yb || 0)) + ' 🟥' + ((c.ra || 0) + (c.rb || 0)), badge: '' });
     if (m.result && m.result.note) rows.push({ main: 'توضیح', sub: m.result.note, badge: '' });
@@ -253,13 +317,7 @@ const Export = (() => {
   }
 
   function backup() {
-    const t = Store.active();
-    const blob = new Blob([Store.exportJSON()], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.download = 'bracket-backup-' + new Date().toISOString().slice(0, 10) + '.json';
-    a.href = URL.createObjectURL(blob);
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    shareTextFile(Store.exportJSON(), 'bracket-backup-' + new Date().toISOString().slice(0, 10) + '.json', 'application/json');
   }
 
   function restore(input) {
@@ -291,12 +349,12 @@ const Export = (() => {
       const r = Engine.record(t, tm.id);
       lines.push([tm.name, tm.coach, tm.rank, r.played, r.won, r.lost, r.gf, r.ga, r.y, r.r].map(q).join(','));
     });
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.download = t.name + '.csv';
-    a.href = URL.createObjectURL(blob);
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    lines.push('');
+    lines.push('بازیکن,تیم,گل,پاس گل,بازی');
+    Engine.scorersTable(t).forEach(p => {
+      lines.push([p.name, Engine.teamName(t, p.team), p.goals, p.assists, p.played].map(q).join(','));
+    });
+    shareTextFile(lines.join('\n'), t.name + '.csv', 'text/csv;charset=utf-8');
   }
 
   return { png, print, backup, restore, csv, scoreText, pngStats, pngTeams, pngMatches, pngMatch };

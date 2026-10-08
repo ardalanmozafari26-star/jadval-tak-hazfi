@@ -7,10 +7,12 @@
     "sync": "npx cap sync android"
   },
   "dependencies": {
-    "@capacitor/core": "^6.1.4"
+    "@capacitor/core": "^6.1.4",
+    "@capacitor/filesystem": "^8.1.4",
+    "@capacitor/share": "^8.0.3"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.1.4",
-    "@capacitor/android": "^6.1.4"
+    "@capacitor/android": "^6.1.4",
+    "@capacitor/cli": "^6.1.4"
   }
 }

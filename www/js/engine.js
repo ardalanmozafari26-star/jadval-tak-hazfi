@@ -53,6 +53,7 @@ const Engine = (() => {
       penA: null, penB: null, games: [],
       date: '', time: '', place: '', ref: '',
       cards: { ya: 0, yb: 0, ra: 0, rb: 0 }, mvp: '', photo: null,
+      scorers: [],
       status: 'scheduled', result: null, locked: false
     };
   }
@@ -209,7 +210,7 @@ const Engine = (() => {
   function clearSelf(m) {
     m.status = 'scheduled'; m.result = null;
     m.scoreA = null; m.scoreB = null; m.etA = null; m.etB = null;
-    m.penA = null; m.penB = null; m.games = [];
+    m.penA = null; m.penB = null; m.games = []; m.scorers = [];
   }
   function clearResult(t, matchId) {
     const m = findMatch(t, matchId);
@@ -301,6 +302,7 @@ const Engine = (() => {
       ra: num(d.ra) || 0, rb: num(d.rb) || 0
     };
     m.mvp = normalizeMvp(d.mvp);
+    m.scorers = normalizeScorers(d.scorers, m);
     if (d.photo !== undefined) m.photo = d.photo;
     if (d.date !== undefined) { m.date = d.date; m.time = d.time; m.place = d.place; m.ref = d.ref; }
     propagate(t, m);
@@ -513,6 +515,38 @@ const Engine = (() => {
       .slice(0, 10);
   }
 
+  /* گلزن‌ها و پاسورها: [{name, team, goals, assists}] */
+  function normalizeScorers(list, m) {
+    if (!Array.isArray(list)) return (m && Array.isArray(m.scorers)) ? m.scorers : [];
+    const out = [];
+    for (const s of list) {
+      const name = String((s && s.name) || '').trim();
+      if (!name) continue;
+      const team = (s.team === (m && m.a) || s.team === (m && m.b)) ? s.team : null;
+      const g = parseInt(s.goals, 10), a = parseInt(s.assists, 10);
+      out.push({ name, team, goals: isNaN(g) || g < 0 ? 0 : g, assists: isNaN(a) || a < 0 ? 0 : a });
+    }
+    return out;
+  }
+  /* جدول تجمیعی گلزنان و پاسورها: مرتب گل، بعد پاس گل */
+  function scorersTable(t) {
+    const map = {};
+    for (const { m } of allMatches(t)) {
+      if (m.status !== 'done' || !m.result || m.result.type !== 'score') continue;
+      if (!Array.isArray(m.scorers)) continue;
+      for (const s of m.scorers) {
+        const key = s.name + '|' + (s.team || '');
+        if (!map[key]) map[key] = { name: s.name, team: s.team, goals: 0, assists: 0, played: 0, _ids: {} };
+        map[key].goals += s.goals || 0;
+        map[key].assists += s.assists || 0;
+        if (!map[key]._ids[m.id]) { map[key]._ids[m.id] = 1; map[key].played++; }
+      }
+    }
+    return Object.keys(map).map(k => {
+      const r = map[k]; delete r._ids; return r;
+    }).sort((a, b) => b.goals - a.goals || b.assists - a.assists || a.name.localeCompare(b.name, 'fa'));
+  }
+
   function todayISO() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -529,6 +563,6 @@ const Engine = (() => {
     nextPow2, roundTitle, generateBracket, findMatch, teamName,
     setResult, clearResult, setSchedule, resetBracket, swapTeams,
     allMatches, matchNumber, record, finalRank, fairPoints, totals, displayScore,
-    matchWinner, mvpName, mvpStatsLine, tournamentMvp, todayISO, faDate, faNum
+    matchWinner, mvpName, mvpStatsLine, tournamentMvp, scorersTable, todayISO, faDate, faNum
   };
 })();
