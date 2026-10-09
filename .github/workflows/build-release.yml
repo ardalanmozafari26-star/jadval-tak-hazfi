@@ -1,0 +1,59 @@
+name: Build Release APK
+
+# خروجی امضاشده نهایی برای انتشار (مایکت)
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Restore keystore
+        run: echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/release.keystore"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: Build signed release APK
+        run: |
+          cd android && ./gradlew assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/release.keystore" \
+            "-Pandroid.injected.signing.store.password=$KS_PASS" \
+            "-Pandroid.injected.signing.key.alias=$KS_ALIAS" \
+            "-Pandroid.injected.signing.key.password=$KS_PASS"
+        env:
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.KEY_ALIAS }}
+
+      - name: Verify signature
+        run: |
+          APK=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
+          echo "APK: $APK"
+          SIGNSR=$(find "$ANDROID_HOME" -name apksigner | head -1)
+          "$SIGNSR" verify --print-certs "$APK"
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: jadval-tak-hazfi-release
+          path: android/app/build/outputs/apk/release/*.apk

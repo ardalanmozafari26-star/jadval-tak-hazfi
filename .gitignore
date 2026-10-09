@@ -3,4 +3,5 @@ android/app/build/
 android/.gradle/
 apk/
 dist/
+exefile/
 *.log
