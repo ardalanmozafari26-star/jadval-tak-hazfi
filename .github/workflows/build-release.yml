@@ -36,14 +36,21 @@ jobs:
 
       - name: Build signed release APK
         run: |
-          cd android && ./gradlew assembleRelease --no-daemon -x lint \
+          cd android && ./gradlew assembleRelease --no-daemon -x lint --stacktrace \
             -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/release.keystore" \
             "-Pandroid.injected.signing.store.password=$KS_PASS" \
             "-Pandroid.injected.signing.key.alias=$KS_ALIAS" \
-            "-Pandroid.injected.signing.key.password=$KS_PASS"
+            "-Pandroid.injected.signing.key.password=$KS_PASS" > "$GITHUB_WORKSPACE/build.log" 2>&1; EC=$?; tail -40 "$GITHUB_WORKSPACE/build.log"; exit $EC
         env:
           KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
           KS_ALIAS: ${{ secrets.KEY_ALIAS }}
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build-log
+          path: build.log
 
       - name: Verify signature
         run: |
