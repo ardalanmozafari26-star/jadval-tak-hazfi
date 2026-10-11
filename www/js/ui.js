@@ -1,12 +1,39 @@
-/* رابط کاربری */
+/* رابط کاربری — تم تیره لیمویی (متصل به داده واقعی، آفلاین) */
 const UI = (() => {
   let view = 'home';
   let zoomLevel = 1;
   let bracketMode = 'tree'; // tree | list
+  let currentRound = 0;
+  let overviewOn = false;
+
   function toggleBracketMode() {
     bracketMode = bracketMode === 'tree' ? 'list' : 'tree';
+    if (bracketMode === 'list') overviewOn = false;
     renderBracket();
   }
+  function showRound(i) {
+    currentRound = i;
+    overviewOn = false;
+    bracketMode = 'tree';
+    renderBracket();
+  }
+  function toggleOverview() {
+    overviewOn = !overviewOn;
+    if (overviewOn) bracketMode = 'tree';
+    renderBracket();
+  }
+  function openToolsDialog() {
+    openModal('<h2>ابزارهای جدول</h2>' +
+      '<p style="font-size:12px;color:var(--muted);margin:0 0 10px">نمای جدول و خروجی‌ها</p>' +
+      '<div class="grid2">' +
+      '<button class="action" onclick="UI.closeModal();UI.toggleOverview()">◈ نمای کل مسیر</button>' +
+      '<button class="action" onclick="UI.closeModal();UI.switchView(\'matches\')">📋 نمای فهرستی</button>' +
+      '<button class="action" onclick="UI.closeModal();Export.png()">🖼️ عکس PNG</button>' +
+      '<button class="action" onclick="UI.closeModal();Export.print()">🖨️ چاپ / PDF</button>' +
+      '<button class="action" onclick="UI.closeModal();Export.csv()">📊 خروجی CSV</button>' +
+      '<button class="action" onclick="UI.closeModal();UI.openDrawDialog()">🎲 قرعه‌کشی مجدد</button></div>');
+  }
+
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -14,13 +41,17 @@ const UI = (() => {
   const STATUS = { setup: 'آماده‌سازی', ongoing: 'در حال برگزاری', done: 'به پایان رسید' };
 
   function avatar(team, size) {
-    if (!team) return '<span class="avatar" style="background:#94a3b8">؟</span>';
+    if (!team) return '<span class="avatar" style="background:#5b6675">؟</span>';
     if (team.photo) return '<span class="avatar" style="background:#000"><img src="' + team.photo + '" alt=""></span>';
     return '<span class="avatar" style="background:' + team.color + '">' + esc((team.name || '?').trim().charAt(0)) + '</span>';
   }
+  function crest(team) {
+    if (!team) return '<span class="crest" style="background:#5b6675">؟</span>';
+    if (team.photo) return '<span class="crest"><img src="' + team.photo + '" alt=""></span>';
+    return '<span class="crest" style="background:' + (team.color || '#5b6675') + '">' + esc((team.name || '?').trim().charAt(0)) + '</span>';
+  }
   function teamById(t, id) { return t.teams.find(x => x.id === id); }
 
-  /* فشرده‌سازی عکس به dataURL */
   function fileToThumb(file, maxSize, cb) {
     const rd = new FileReader();
     rd.onload = e => {
@@ -47,7 +78,6 @@ const UI = (() => {
     });
   }
 
-  /* ---------- نویگیشن شستی ---------- */
   function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms || 15); } catch (e) {} }
 
   const FABS = {
@@ -75,7 +105,6 @@ const UI = (() => {
     if (!bar || !ind) return;
     const btn = bar.querySelector('button.active');
     if (!btn) return;
-    // فقط transform (کامپوزیتور، بدون layout): مبدأ چپ، جابه‌جایی + مقیاس
     const br = bar.getBoundingClientRect(), r = btn.getBoundingClientRect();
     const x = Math.max(0, r.left - br.left + 4), w = Math.max(8, r.width - 8);
     ind.style.transform = 'translateX(' + x + 'px) scaleX(' + w + 'px)';
@@ -104,15 +133,25 @@ const UI = (() => {
   function renderHeader() {
     const t = Store.active();
     applyBrand(t);
-    if (!t) { $('tournamentName').textContent = 'جدول تک حذفی'; $('tournamentMeta').textContent = 'تورنمنتی انتخاب نشده'; return; }
+    if (!t) {
+      $('tournamentName').textContent = 'تورنمنتی نیست';
+      $('tournamentMeta').textContent = 'از منو یک تورنمنت بساز یا انتخاب کن';
+      if ($('heroDone')) { $('heroDone').textContent = '۰'; $('heroTotal').textContent = '۰'; $('heroBar').style.width = '0%'; }
+      return;
+    }
     $('tournamentName').textContent = t.name;
-    const played = Engine.allMatches(t).filter(x => x.m.status === 'done').length;
-    const total = Engine.allMatches(t).length;
-    $('tournamentMeta').textContent = (SPORTS[t.sport] || '') + ' • ' + t.teams.length + ' تیم • ' +
-      (STATUS[t.status] || '') + (total ? ' • ' + played + ' از ' + total + ' بازی' : '');
+    const all = Engine.allMatches(t);
+    const played = all.filter(x => x.m.status === 'done').length;
+    const total = all.length;
+    const seriesLbl = (t.settings.series || 1) > 1 ? 'بهترین از ' + Engine.faNum(t.settings.series) : 'تک‌بازی';
+    $('tournamentMeta').textContent = (SPORTS[t.sport] || '') + '  /  ' + Engine.faNum(t.teams.length) + ' تیم  /  ' + seriesLbl;
+    if ($('heroDone')) {
+      $('heroDone').textContent = Engine.faNum(played);
+      $('heroTotal').textContent = Engine.faNum(total);
+      $('heroBar').style.width = (total ? Math.round(played / total * 100) : 0) + '%';
+    }
   }
 
-  /* رنگ برند تورنمنت فعال روی کل اپ */
   function applyBrand(t) {
     try {
       const b = brandColorOf(t || null);
@@ -125,13 +164,14 @@ const UI = (() => {
 
   function renderDrawer() {
     const box = $('tournamentList');
+    if (!box) return;
     const all = Store.db.tournaments;
     box.innerHTML = all.length ? all.map(t =>
       '<div class="t-item' + (t.id === Store.db.activeId ? ' active' : '') + '" onclick="UI.selectTournament(\'' + t.id + '\')">' +
-      '<div class="n">' + esc(t.name) + '</div><div class="m">' + t.teams.length + ' تیم • ' + (STATUS[t.status] || '') + '</div></div>'
+      '<div class="n">' + esc(t.name) + '</div><div class="m">' + Engine.faNum(t.teams.length) + ' تیم • ' + (STATUS[t.status] || '') + '</div></div>'
     ).join('') : '<p style="color:var(--muted)">تورنمنتی نیست.</p>';
   }
-  function selectTournament(id) { Store.setActive(id); closeDrawer(); render(); }
+  function selectTournament(id) { Store.setActive(id); closeDrawer(); currentRound = 0; overviewOn = false; render(); }
   function openDrawer() { $('drawer').classList.add('open'); $('drawerOverlay').classList.remove('hidden'); }
   function closeDrawer() { $('drawer').classList.remove('open'); $('drawerOverlay').classList.add('hidden'); }
 
@@ -148,20 +188,19 @@ const UI = (() => {
       statCard(t.teams.length, 'تیم', t.teams.length) + statCard(all.length, 'بازی', all.length) +
       statCard(done, 'انجام‌شده', done) + statCard(pct + '٪', 'پیشرفت', null);
     countUp();
-    // ویجت داشبورد: حلقه پیشرفت + بازی بعدی
     const next = all.find(x => x.m.status !== 'done' && x.m.a && x.m.b && x.m.a !== 'BYE' && x.m.b !== 'BYE');
     const R = 30, C = 2 * Math.PI * R;
     const dash = document.createElement('div');
     dash.className = 'dash';
     dash.innerHTML =
-      '<div class="dash-card"><svg class="ring" viewBox="0 0 74 74"><circle cx="37" cy="37" r="' + R + '" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="8"/>' +
-      '<circle cx="37" cy="37" r="' + R + '" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-dasharray="' + (C * pct / 100) + ' ' + C + '" transform="rotate(-90 37 37)"/>' +
+      '<div class="dash-card"><svg class="ring" viewBox="0 0 74 74"><circle cx="37" cy="37" r="' + R + '" fill="none" stroke="rgba(0,0,0,.22)" stroke-width="8"/>' +
+      '<circle cx="37" cy="37" r="' + R + '" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-dasharray="' + (C * pct / 100) + ' ' + C + '" transform="rotate(-90 37 37)"/>' +
       '<text x="37" y="43" text-anchor="middle" class="pct">' + pct + '٪</text></svg><div class="sub">پیشرفت تورنمنت</div></div>' +
       '<div class="dash-card gold"><div class="sub">' + (next ? esc(next.roundTitle) + ' • بازی ' + Engine.faNum(Engine.matchNumber(t, next.m.id)) : 'بازی بعدی') + '</div>' +
       '<div class="big">' + (next ? esc(Engine.teamName(t, next.m.a)) + ' ⚔️ ' + esc(Engine.teamName(t, next.m.b)) : '—') + '</div>' +
       '<div class="sub">' + (next ? countdownText(next.m) : 'همه بازی‌ها تمام شده 🎉') + '</div>' +
       (next ? '<div class="sub">' + esc([next.m.place, next.m.ref ? 'داور: ' + next.m.ref : ''].filter(Boolean).join(' • ') || 'مکان و داور ثبت نشده') + '</div>' +
-      '<button class="btn small" style="margin-top:8px" onclick="UI.openMatchDialog(\'' + next.m.id + '\')">✍️ ثبت نتیجه</button>' : '') + '</div></div>';
+      '<button class="action small" style="margin-top:8px" onclick="UI.openMatchDialog(\'' + next.m.id + '\')">✍️ ثبت نتیجه</button>' : '') + '</div>';
     const hc = $('homeContent');
     const old = hc.querySelector('.dash');
     if (old) old.remove();
@@ -174,9 +213,8 @@ const UI = (() => {
     const recent = all.filter(x => x.m.status === 'done' && x.m.result && x.m.result.type !== 'bye').slice(-5).reverse();
     $('homeRecent').innerHTML = recent.length ? recent.map(x => matchRow(t, x.m, x.roundTitle)).join('') : '<p style="color:var(--muted)">هنوز نتیجه‌ای ثبت نشده؛ اولین برد را بزن! ⚽</p>';
   }
-  const statCard = (v, l, n) => '<div class="stat-card"><div class="v"' + (n !== null && n !== undefined ? ' data-n="' + n + '"' : '') + '>' + v + '</div><div class="l">' + l + '</div></div>';
+  const statCard = (v, l, n) => '<div class="stat-card"><div class="v"' + (n !== null && n !== undefined ? ' data-n="' + n + '"' : '') + '>' + (typeof v === 'number' ? Engine.faNum(v) : v) + '</div><div class="l">' + l + '</div></div>';
 
-  /* شمارش معکوس انسانی تا شروع بازی */
   function countdownText(m) {
     if (!m.date) return 'هنوز زمانش مشخص نیست 📅';
     const now = new Date();
@@ -201,7 +239,6 @@ const UI = (() => {
     return Engine.faDate(m.date);
   }
 
-  /* ---------- بودجه عملکرد: حرکت کم، احترام به کاربر ---------- */
   function reducedMotion() {
     try { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
     catch (e) { return false; }
@@ -222,14 +259,7 @@ const UI = (() => {
     for (let i = 0; i < n; i++) s += '<div class="skel" style="height:' + (h || 54) + 'px;margin-bottom:8px"></div>';
     return s;
   }
-  /* اسکلت اول، محتوای واقعی در فریم بعد (فقط جدول‌های بزرگ) */
-  function withSkel(box, n, fn) {
-    if (!box || !n || n < 1 || reducedMotion()) { fn(); return; }
-    box.innerHTML = skelBars(n);
-    requestAnimationFrame(() => requestAnimationFrame(fn));
-  }
 
-  /* شمارش صعودی اعداد */
   function countUp() {
     const instant = reducedMotion();
     document.querySelectorAll('#homeStats .v[data-n]').forEach(el => {
@@ -245,16 +275,16 @@ const UI = (() => {
     });
   }
 
-  /* بارش confetti قهرمانی (با احترام به حرکت/گوشی ضعیف) */
   function celebrate() {
     buzz([40, 40, 80]);
     if (reducedMotion() || isLite()) return;
     const cv = document.createElement('canvas');
     cv.id = 'confettiCv';
+    cv.style.cssText = 'position:fixed;inset:0;z-index:300;pointer-events:none';
     cv.width = innerWidth; cv.height = innerHeight;
     document.body.appendChild(cv);
     const c = cv.getContext('2d');
-    const colors = ['#16a34a', '#eab308', '#2563eb', '#dc2626', '#fff'];
+    const colors = ['#c4f35b', '#eab308', '#2563eb', '#dc2626', '#fff'];
     const ps = [];
     for (let i = 0; i < 140; i++) ps.push({ x: Math.random() * cv.width, y: -20 - Math.random() * cv.height / 2, s: 4 + Math.random() * 6, v: 2 + Math.random() * 3, r: Math.random() * Math.PI, vr: (Math.random() - .5) * .2, col: colors[i % colors.length] });
     const t0 = performance.now();
@@ -272,34 +302,56 @@ const UI = (() => {
     requestAnimationFrame(frame);
   }
 
-  /* کامپوننت واحد کارت بازی (scorecell): همه لیست‌ها */
+  /* کارت واحد بازی — سبک نمونه جدید */
   function teamDot(t, id) {
     const tm = id && id !== 'BYE' ? teamById(t, id) : null;
-    return '<i class="tdot" style="background:' + ((tm && tm.color) || '#94a3b8') + '"></i>';
+    return '<i class="tdot" style="background:' + ((tm && tm.color) || '#5b6675') + '"></i>';
   }
-  function statusPill(t, m) {
-    if (m.status === 'done') return '<span class="pill done"><i></i>تمام‌شده</span>';
-    if (m.date === todayISO()) return '<span class="pill today"><i></i>امروز</span>';
-    return '<span class="pill soon"><i></i>زمان‌بندی‌شده</span>';
+  function statusTag(m) {
+    if (m.status === 'done') return '<span class="tag tag-done"><i></i>تمام‌شده</span>';
+    if (m.date && m.date === Engine.todayISO()) return '<span class="tag tag-today"><i></i>امروز</span>';
+    return '<span class="tag tag-soon"><i></i>زمان‌بندی‌شده</span>';
   }
+  function statusPill(t, m) { return statusTag(m); }
   function todayISO() { return Engine.todayISO(); }
   function scorersLine(t, m) {
     if (!Array.isArray(m.scorers) || !m.scorers.length) return '';
     const top = [...m.scorers].sort((a, b) => (b.goals || 0) - (a.goals || 0)).slice(0, 3);
-    return '<div class="scorers">⚽ ' + top.map(s => esc(s.name) + (s.goals > 1 ? ' ' + Engine.faNum(s.goals) : '')).join('، ') + '</div>';
+    return '<div class="scorers-line">⚽ ' + top.map(s => esc(s.name) + (s.goals > 1 ? ' ' + Engine.faNum(s.goals) : '')).join('، ') + '</div>';
+  }
+  function sideScore(t, m, side) {
+    if (m.status !== 'done' || !m.result) return '−';
+    if (m.result.type === 'bye') return '✓';
+    if (m.result.type !== 'score') return side === (m.result.winner === m.a ? 'a' : 'b') ? '✓' : '';
+    const ds = Engine.displayScore(m);
+    return Engine.faNum(side === 'a' ? ds.a : ds.b);
   }
   function matchRow(t, m, rt) {
-    const a = Engine.teamName(t, m.a), b = Engine.teamName(t, m.b);
+    const aN = Engine.teamName(t, m.a), bN = Engine.teamName(t, m.b);
     const w = m.status === 'done' && m.result ? m.result.winner : null;
     const num = Engine.matchNumber(t, m.id);
-    return '<div class="match-row' + (m.status === 'done' ? ' done' : '') + '" onclick="UI.openMatchDialog(\'' + m.id + '\')">' +
-      '<div class="sc-top">' + statusPill(t, m) +
+    const tmA = m.a && m.a !== 'BYE' ? teamById(t, m.a) : null;
+    const tmB = m.b && m.b !== 'BYE' ? teamById(t, m.b) : null;
+    const meta = metaLine(t, m);
+    const sched = m.status !== 'done';
+    return '<div class="match-row match' + (m.status === 'done' ? ' done' : '') + '" onclick="UI.openMatchDialog(\'' + m.id + '\')">' +
+      '<div class="sc-top">' + statusTag(m) +
       '<span class="sc-num">' + (num ? 'بازی ' + Engine.faNum(num) + ' • ' : '') + esc(rt || '') + '</span></div>' +
-      '<div class="teams"><span class="tname' + (w === m.a ? ' winner' : '') + '">' + teamDot(t, m.a) + esc(a) + '</span>' +
-      '<span class="score">' + scoreShort(t, m) + '</span>' +
-      '<span class="tname' + (w === m.b ? ' winner' : '') + '">' + esc(b) + teamDot(t, m.b) + '</span></div>' +
-      scorersLine(t, m) +
-      '<div class="meta"><span>' + esc(metaLine(t, m)) + '</span></div></div>';
+      '<div class="match-teams">' +
+      '<div class="team-line' + (w === m.a ? ' winner' : '') + '">' + crest(tmA) + '<span class="tname">' + esc(aN) + '</span><span class="score-box">' + sideScore(t, m, 'a') + '</span></div>' +
+      '<div class="team-line' + (w === m.b ? ' winner' : '') + '">' + crest(tmB) + '<span class="tname">' + esc(bN) + '</span><span class="score-box">' + sideScore(t, m, 'b') + '</span></div>' +
+      '</div>' + scorersLine(t, m) +
+      '<div class="match-foot"><span class="meta">' + esc(meta || 'در انتظار ثبت نتیجه') + '</span>' +
+      (sched
+        ? '<button class="action small' + (isNext(t, m) ? ' primary' : '') + '" onclick="event.stopPropagation();UI.openMatchDialog(\'' + m.id + '\')">ثبت نتیجه ←</button>'
+        : '<button class="action small" onclick="event.stopPropagation();UI.openMatchDialog(\'' + m.id + '\')">جزئیات</button>') +
+      '</div></div>';
+  }
+  function isNext(t, m) {
+    if (!m || m.status === 'done') return false;
+    const all = Engine.allMatches(t);
+    const nx = all.find(x => x.m.status !== 'done' && x.m.a && x.m.b && x.m.a !== 'BYE' && x.m.b !== 'BYE');
+    return nx && nx.m.id === m.id;
   }
   function scoreShort(t, m) {
     if (m.status !== 'done' || !m.result) return '–';
@@ -317,7 +369,7 @@ const UI = (() => {
     if (m.time) parts.push(m.time);
     if (m.place) parts.push(m.place);
     if (m.status === 'done' && m.result && m.result.type === 'score') {
-    const c = m.cards || {};
+      const c = m.cards || {};
       const tot = (c.ya || 0) + (c.yb || 0) + (c.ra || 0) + (c.rb || 0);
       if (tot) parts.push('🟨' + Engine.faNum((c.ya || 0) + (c.yb || 0)) + ' 🟥' + Engine.faNum((c.ra || 0) + (c.rb || 0)));
       const mn = Engine.mvpName(m);
@@ -327,105 +379,151 @@ const UI = (() => {
     return parts.join(' • ');
   }
 
-  /* ---------- جدول ---------- */
+  /* ---------- جدول با تب مرحله‌ای ---------- */
   function zoom(d) { zoomLevel = Math.min(1.8, Math.max(0.5, Math.round((zoomLevel + d) * 10) / 10)); applyZoom(); }
   function zoomReset() { zoomLevel = 1; applyZoom(); }
-  function applyZoom() { $('bracket').style.transform = 'scale(' + zoomLevel + ')'; }
+  function applyZoom() { const b = $('bracket'); if (b) b.style.transform = 'scale(' + zoomLevel + ')'; }
 
   function renderBracket() {
     const t = Store.active();
     const has = t && t.rounds.length;
     $('bracketEmpty').classList.toggle('hidden', !!has);
-    $('bracketToolbar').classList.toggle('hidden', !has);
+    const body = $('bracketBody');
+    if (body) body.classList.toggle('hidden', !has);
     if (!has) {
-      $('bracketScroll').classList.add('hidden'); $('bracketList').classList.add('hidden');
-      if (t && !t.teams.length) $('bracketEmpty').querySelector('p').textContent = 'اول تیم‌ها را ثبت کن، بعد قرعه‌کشی کن.';
+      if (t && !t.teams.length) { const p = $('bracketEmpty').querySelector('p'); if (p) p.textContent = 'اول تیم‌ها را ثبت کن، بعد قرعه‌کشی کن.'; }
+      renderHeader();
       return;
     }
+    if (currentRound < 0 || currentRound >= t.rounds.length) currentRound = t.rounds.length - 1;
+
+    // تب‌ها
+    const tabs = $('roundTabs');
+    tabs.innerHTML = t.rounds.map((rd, r) => {
+      const tot = rd.matches.length;
+      const dn = rd.matches.filter(m => m.status === 'done').length;
+      const st = dn === tot ? 'تمام‌شده' : (dn > 0 ? 'در جریان' : 'پیش رو');
+      return '<button class="round-tab' + (r === currentRound && !overviewOn && bracketMode !== 'list' ? ' active' : '') + '" role="tab" aria-selected="' + (r === currentRound) + '" onclick="UI.showRound(' + r + ')">' +
+        esc(rd.title) + '<small>' + Engine.faNum(tot) + ' بازی • ' + st + '</small></button>';
+    }).join('');
+    // راهنما
+    const hint = $('roundHintText');
+    if (hint) {
+      if (currentRound >= t.rounds.length - 1) hint.textContent = 'برندهٔ فینال قهرمان می‌شود 🏆';
+      else hint.textContent = 'برندهٔ هر بازی به ' + t.rounds[currentRound + 1].title + ' می‌رود';
+    }
+    const ol = $('overviewBtnLabel');
+    if (ol) ol.textContent = overviewOn ? 'نمای مرحله‌ای' : 'کل مسیر';
+
+    const rp = $('roundPanels'), sc = $('bracketScroll'), bl = $('bracketList'), tb = $('bracketToolbar');
+    const tp = t.thirdPlace, tpb = $('thirdPlaceBox');
     if (bracketMode === 'list') {
-      $('bracketScroll').classList.add('hidden');
-      const box = $('bracketList');
-      box.classList.remove('hidden');
+      rp.classList.add('hidden'); sc.classList.add('hidden'); bl.classList.remove('hidden'); tb.classList.remove('hidden');
       let lastRt = '';
-      box.innerHTML = Engine.allMatches(t).map(x => {
-        const h = x.roundTitle !== lastRt ? '<h3>' + esc(x.roundTitle) + '</h3>' : '';
+      bl.innerHTML = Engine.allMatches(t).map(x => {
+        const h = x.roundTitle !== lastRt ? '<h3 class="block-title">' + esc(x.roundTitle) + '</h3>' : '';
         lastRt = x.roundTitle;
         return h + matchRow(t, x.m, x.roundTitle);
       }).join('');
-      const tp = t.thirdPlace;
-      const tb = $('thirdPlaceBox');
-      tb.classList.add('hidden');
+      if (tp) { tpb.classList.remove('hidden'); tpb.innerHTML = '<h3 class="block-title">بازی رده‌بندی</h3>' + matchRow(t, tp, 'سوم / چهارم'); }
+      else tpb.classList.add('hidden');
       return;
     }
-    $('bracketList').classList.add('hidden');
-    $('bracketScroll').classList.remove('hidden');
-    zoomReset();
+    if (overviewOn) {
+      rp.classList.add('hidden'); bl.classList.add('hidden'); sc.classList.remove('hidden'); tb.classList.remove('hidden');
+      zoomReset();
+      paintTree(t);
+      if (tp) { tpb.classList.remove('hidden'); tpb.innerHTML = '<h3 class="block-title">بازی رده‌بندی</h3>' + matchRow(t, tp, 'سوم / چهارم'); }
+      else tpb.classList.add('hidden');
+      return;
+    }
+    // نمای مرحله‌ای
+    bl.classList.add('hidden'); sc.classList.add('hidden'); tb.classList.add('hidden');
+    rp.classList.remove('hidden');
+    const rd = t.rounds[currentRound];
+    let html = '<div class="match-cards">' + rd.matches.map(m => matchRow(t, m, rd.title)).join('') + '</div>';
+    if (currentRound < t.rounds.length - 1) {
+      const nxT = t.rounds[currentRound + 1].title;
+      const nums = rd.matches.map(m => Engine.matchNumber(t, m.id)).filter(Boolean);
+      const rng = nums.length ? 'برندهٔ بازی ' + Engine.faNum(Math.min.apply(null, nums)) + ' مقابل برندهٔ بازی ' + Engine.faNum(Math.max.apply(null, nums)) : 'برندگان این مرحله';
+      html += '<div class="path-join" aria-hidden="true"></div>' +
+        '<button class="next-card" onclick="UI.showRound(' + (currentRound + 1) + ')"><span class="next-ic">🏆</span>' +
+        '<span><h4>مقصد بعدی: ' + esc(nxT) + '</h4><p>' + esc(rng) + '</p></span><span class="next-arrow">◀</span></button>';
+    } else {
+      const champ = t.champion ? teamById(t, t.champion) : null;
+      html += '<div class="panel pad" style="margin-top:12px;text-align:center">' +
+        '<div class="champion-emblem">🏆</div>' +
+        '<h3 style="margin:12px 0 4px">' + (champ ? esc(champ.name) : 'جام در انتظار قهرمان') + '</h3>' +
+        '<p style="margin:0;font-size:12px;color:var(--muted)">' + (champ ? 'قهرمان ' + esc(t.name) : 'برندهٔ فینال اینجا معرفی می‌شود.') + '</p></div>';
+    }
+    rp.innerHTML = html;
+    if (tp && currentRound >= t.rounds.length - 2) { tpb.classList.remove('hidden'); tpb.innerHTML = '<h3 class="block-title">بازی رده‌بندی</h3>' + matchRow(t, tp, 'سوم / چهارم'); }
+    else tpb.classList.add('hidden');
+  }
+
+  function paintTree(t) {
     const treeHtml = t.rounds.map((rd, r) =>
       '<div class="round"><div class="round-title">' + esc(rd.title) + '</div><div class="round-matches">' +
       rd.matches.map(m => bmatch(t, m)).join('') + '</div></div>'
     ).join('');
-    const paintTree = () => {
-      $('bracket').innerHTML = treeHtml;
-      const tp = t.thirdPlace;
-      const box = $('thirdPlaceBox');
-      if (tp) {
-        box.classList.remove('hidden');
-        box.innerHTML = '<h3>بازی رده‌بندی</h3>' + matchRow(t, tp, 'سوم / چهارم');
-      } else box.classList.add('hidden');
-    };
-    // جدول‌های بزرگ (۸+ بازی): اول اسکلت، بعد رندر واقعی
+    const paint = () => { $('bracket').innerHTML = treeHtml; };
     const totalM = t.rounds.reduce((n, rd) => n + rd.matches.length, 0);
-    if (totalM > 8) {
+    if (totalM > 8 && !reducedMotion()) {
       $('bracket').innerHTML = '<div style="min-width:280px;flex:1">' + skelBars(6, 64) + '</div>';
-      if (reducedMotion()) paintTree();
-      else requestAnimationFrame(() => requestAnimationFrame(paintTree));
-    } else paintTree();
+      requestAnimationFrame(() => requestAnimationFrame(paint));
+    } else paint();
   }
 
   function bmatch(t, m) {
     const w = m.status === 'done' && m.result ? m.result.winner : null;
     const ds = Engine.displayScore(m);
+    const fmt = v => (v === null || v === undefined || v === '' ? '' : Engine.faNum(v));
     const side = (id, key) => {
       const tm = id && id !== 'BYE' ? teamById(t, id) : null;
       const nm = !id ? '...' : id === 'BYE' ? 'استراحت' : (tm ? tm.name : 'حذف‌شده');
       return '<div class="bm-team' + (w === id && id && id !== 'BYE' ? ' w' : (m.status === 'done' && id && id !== 'BYE' ? ' l' : '')) + '">' +
-        (tm ? avatar(tm) : '<span class="avatar" style="background:#94a3b8">؟</span>') +
+        (tm ? avatar(tm) : '<span class="avatar" style="background:#5b6675">؟</span>') +
         '<span class="nm">' + esc(nm) + '</span>' +
-        '<span class="sc">' + (key === null || key === undefined || key === '' ? '' : esc(String(key))) + '</span></div>';
+        '<span class="sc">' + esc(String(key === null || key === undefined ? '' : key)) + '</span></div>';
     };
     let mid;
     if (m.status !== 'done') mid = '<div class="bm-vs">در انتظار</div>';
     else if (!m.result || m.result.type === 'bye') mid = '<div class="bm-vs">✓ صعود با استراحت</div>';
     else if (m.result.type !== 'score') mid = '<div class="bm-vs">' + (m.result.type === 'walkover' ? 'انصراف حریف' : 'حذف انضباطی') + '</div>';
-    else mid = '<div class="bm-vs">' + Export.scoreText(t, m) + '</div>';
+    else mid = '<div class="bm-vs">' + esc(Export.scoreText(t, m)) + '</div>';
     return '<div class="bmatch' + (m.status === 'done' ? ' done' : '') + '" onclick="UI.openMatchDialog(\'' + m.id + '\')">' +
-      side(m.a, ds.a) + mid + side(m.b, ds.b) +
+      side(m.a, fmt(ds.a)) + mid + side(m.b, fmt(ds.b)) +
       '<div class="bm-info">بازی ' + Engine.faNum(Engine.matchNumber(t, m.id)) + ' • ' + esc(metaLine(t, m)) + (m.locked ? ' 🔒' : '') + '</div></div>';
   }
 
-  /* empty state احساسی با اکشن مستقیم */
   function emptyState(icon, title, sub, btn, act) {
     return '<div class="empty"><div class="empty-icon">' + icon + '</div>' +
       '<div class="empty-title">' + title + '</div>' +
       (sub ? '<p>' + sub + '</p>' : '') +
-      (btn ? '<button class="btn primary" onclick="' + act + '">' + btn + '</button>' : '') + '</div>';
+      (btn ? '<button class="action primary" onclick="' + act + '">' + btn + '</button>' : '') + '</div>';
   }
 
   /* ---------- تیم‌ها ---------- */
+  function hasUpcoming(t, teamId) {
+    return Engine.allMatches(t).some(x => x.m.status !== 'done' && (x.m.a === teamId || x.m.b === teamId));
+  }
   function renderTeams() {
     const t = Store.active();
     if (!t) { $('teamsList').innerHTML = '<p>تورنمنتی انتخاب نشده.</p>'; return; }
-    $('teamsCount').textContent = 'تیم‌ها (' + Engine.faNum(t.teams.length) + ')';
+    $('teamsCount').innerHTML = 'تیم‌ها <span style="color:var(--primary)">' + Engine.faNum(t.teams.length) + '</span>';
     const q = (($('teamSearch') && $('teamSearch').value) || '').trim();
     const list = t.teams.filter(tm => !q || tm.name.includes(q) || (tm.coach || '').includes(q));
     $('teamsList').innerHTML = list.length ? list.map(tm => {
       const r = t.rounds.length ? Engine.record(t, tm.id) : null;
-      return '<div class="team-row" data-tm="' + tm.id + '" style="--tc:' + (tm.color || '#94a3b8') + '">' + avatar(tm) +
+      const st = !t.rounds.length ? '<span class="team-status out">سید ' + Engine.faNum(tm.rank || '—') + '</span>'
+        : t.champion === tm.id ? '<span class="team-status up">قهرمان 🏆</span>'
+        : (r && r.lost > 0 && !hasUpcoming(t, tm.id) ? '<span class="team-status out">حذف‌شده</span>' : '<span class="team-status up">در جام</span>');
+      return '<div class="team-row" data-tm="' + tm.id + '">' + crest(tm) +
         '<div class="info"><div class="n">' + esc(tm.name) + '</div><div class="m">' +
         (tm.coach ? 'مربی: ' + esc(tm.coach) + ' • ' : '') + (tm.rank ? 'سید ' + Engine.faNum(tm.rank) + ' • ' : '') +
-        (r ? r.won + ' برد - ' + r.lost + ' باخت' : 'بدون بازی') + '</div></div>' +
-        '<div class="acts"><button class="mini" onclick="UI.openTeamDialog(\'' + tm.id + '\')">✏️</button>' +
-        '<button class="mini" onclick="UI.removeTeam(\'' + tm.id + '\')">🗑️</button></div></div>';
+        (r ? Engine.faNum(r.won) + ' برد - ' + Engine.faNum(r.lost) + ' باخت' : 'بدون بازی') + '</div></div>' + st +
+        '<div class="acts"><button class="mini" aria-label="ویرایش" onclick="UI.openTeamDialog(\'' + tm.id + '\')">✏️</button>' +
+        '<button class="mini" aria-label="حذف" onclick="UI.removeTeam(\'' + tm.id + '\')">🗑️</button></div></div>';
     }).join('') : (q ? '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">چیزی پیدا نشد</div><p>اسم دیگری را امتحان کن</p></div>'
       : emptyState('👥', 'هنوز تیمی ثبت نشده', 'اسامی تیم‌ها را اضافه کن تا بریم سر قرعه‌کشی 🎲', '＋ افزودن تیم', 'UI.openTeamDialog()'));
   }
@@ -435,15 +533,14 @@ const UI = (() => {
     closeModal();
     Store.removeTeam(t.id, id); render();
   }
-  /* منوی سریع لانگ‌پرس روی تیم */
   function openQuickMenu(teamId) {
     const t = Store.active(); if (!t) return;
     const tm = teamById(t, teamId); if (!tm) return;
     openModal('<div class="quick-menu"><div class="q-name">' + esc(tm.name) + '</div>' +
       '<div class="q-sub">' + esc((tm.coach ? 'مربی: ' + tm.coach + ' • ' : '') + (tm.rank ? 'سید ' + Engine.faNum(tm.rank) : 'بدون سید')) + '</div>' +
-      '<div class="modal-btns"><button class="btn primary" onclick="UI.closeModal();UI.openTeamDialog(\'' + tm.id + '\')">✏️ ویرایش</button>' +
-      '<button class="btn danger" onclick="UI.removeTeam(\'' + tm.id + '\')">🗑️ حذف</button></div>' +
-      '<div class="modal-btns"><button class="btn" onclick="UI.closeModal()">بستن</button></div></div>');
+      '<div class="modal-btns"><button class="action primary" onclick="UI.closeModal();UI.openTeamDialog(\'' + tm.id + '\')">✏️ ویرایش</button>' +
+      '<button class="action danger" onclick="UI.removeTeam(\'' + tm.id + '\')">🗑️ حذف</button></div>' +
+      '<div class="modal-btns"><button class="action" onclick="UI.closeModal()">بستن</button></div></div>');
   }
 
   /* ---------- مسابقات ---------- */
@@ -457,7 +554,7 @@ const UI = (() => {
       .filter(x => (f === 'all' || x.m.status === f) &&
         (!q2 || Engine.teamName(t, x.m.a).includes(q2) || Engine.teamName(t, x.m.b).includes(q2)))
       .map(x => {
-        const h = x.roundTitle !== lastRt ? '<h3>' + esc(x.roundTitle) + '</h3>' : '';
+        const h = x.roundTitle !== lastRt ? '<h3 class="block-title">' + esc(x.roundTitle) + '</h3>' : '';
         lastRt = x.roundTitle;
         return h + matchRow(t, x.m, x.roundTitle);
       }).join('') || '<p style="color:var(--muted)">بازی‌ای با این فیلتر نیست 🔍</p>';
@@ -481,29 +578,30 @@ const UI = (() => {
     const mvpBoard = Engine.tournamentMvp(t);
     const mvpMeta = (typeof SPORTS_META !== 'undefined' && (SPORTS_META[t.sport] || SPORTS_META.custom));
     const primaryLbl = ((mvpMeta.mvpStats.find(s => s.key === mvpMeta.primary)) || {}).label || '';
-    const mvpHtml = mvpBoard.length ? '<h3>ستارگان میدان ⭐</h3>' +
+    const mvpHtml = mvpBoard.length ? '<h3 class="block-title">ستارگان میدان ⭐</h3>' +
       (mvpBoard[0].awards ? '<div class="champ"><div class="t">⭐ بهترین بازیکن تورنمنت</div><div class="n">' + esc(mvpBoard[0].name) + '</div><div class="t">' + Engine.faNum(mvpBoard[0].awards) + ' بار بهترین بازیکن' + (primaryLbl ? ' • ' + Engine.faNum(mvpBoard[0].main) + ' ' + primaryLbl : '') + '</div></div>' : '') +
       '<table class="stats"><tr><th>بازیکن</th><th>تیم</th><th>بهترین بازیکن</th>' + (primaryLbl ? '<th>' + primaryLbl + '</th>' : '') + '</tr>' +
       mvpBoard.map(p => '<tr><td>⭐ ' + esc(p.name) + '</td><td>' + esc(Engine.teamName(t, p.team)) + '</td><td>' + Engine.faNum(p.awards) + '</td>' + (primaryLbl ? '<td>' + Engine.faNum(p.main) + '</td>' : '') + '</tr>').join('') + '</table>' : '';
     box.innerHTML =
-      '<div class="view-head"><h3>آمار تورنمنت</h3><div><button class="btn small" onclick="Export.pngStats()">🖼️ عکس آمار</button></div></div>';
+      '<div class="view-top"><h3 class="block-title" style="margin:0">آمار تورنمنت</h3><button class="action small" onclick="Export.pngStats()">🖼️ عکس آمار</button></div>';
     const paintStats = () => {
       box.insertAdjacentHTML('beforeend',
-        (champ ? '<div class="champ"><div class="t">🏆 قهرمان تورنمنت</div><div class="n">' + esc(champ.name) + '</div></div>' + champPathHtml(t) : '') +
-        '<h3>رده‌بندی نهایی</h3>' + rank.map((r, i) => {
+        (champ
+          ? '<div class="panel pad" style="text-align:center"><div class="champion-emblem">🏆</div><div class="t" style="margin-top:10px;font-size:13px;color:var(--muted)">🏆 قهرمان تورنمنت</div><div class="n" style="font-size:24px;font-weight:800;margin-top:4px">' + esc(champ.name) + '</div></div>' + champPathHtml(t)
+          : '<div class="panel pad" style="text-align:center"><div class="champion-emblem">🏆</div><h3 style="margin:12px 0 4px">قهرمان هنوز مشخص نشده</h3><p style="margin:0;font-size:13px;color:var(--muted)">' + Engine.faNum(Engine.allMatches(t).filter(x => x.m.status !== 'done').length) + ' بازی تا پایان باقی مانده است.</p></div>') +
+        '<h3 class="block-title">رده‌بندی نهایی</h3>' + rank.map((r, i) => {
           const rtm = teamById(t, r.id);
-          return '<div class="rank-row" style="--tc:' + ((rtm && rtm.color) || '#94a3b8') + '"><span class="pos">' + Engine.faNum(i + 1) + '</span>' +
+          return '<div class="rank-row"><span class="pos">' + Engine.faNum(i + 1) + '</span>' +
           avatar(rtm) +
           '<span class="nm">' + esc(Engine.teamName(t, r.id)) + '</span><span class="ti">' + esc(r.title) + '</span></div>'; }).join('') +
-        '<h3>جدول عملکرد تیم‌ها</h3><table class="stats"><tr><th>تیم</th><th>بازی</th><th>برد</th><th>باخت</th><th>زده</th><th>خورده</th><th>تفاضل</th></tr>' +
+        '<h3 class="block-title">جدول عملکرد تیم‌ها</h3><table class="stats"><tr><th>تیم</th><th>بازی</th><th>برد</th><th>باخت</th><th>زده</th><th>خورده</th><th>تفاضل</th></tr>' +
         rows.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.played) + '</td><td>' + Engine.faNum(r.won) +
           '</td><td>' + Engine.faNum(r.lost) + '</td><td>' + Engine.faNum(r.gf) + '</td><td>' + Engine.faNum(r.ga) +
           '</td><td>' + Engine.faNum(r.gf - r.ga) + '</td></tr>').join('') + '</table>' +
-        '<h3>بازی جوانمردانه</h3><table class="stats"><tr><th>تیم</th><th>🟨</th><th>🟥</th><th>امتیاز منفی</th></tr>' +
+        '<h3 class="block-title">بازی جوانمردانه</h3><table class="stats"><tr><th>تیم</th><th>🟨</th><th>🟥</th><th>امتیاز منفی</th></tr>' +
         fair.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.y) + '</td><td>' + Engine.faNum(r.r) +
           '</td><td>' + Engine.faNum(r.fair) + '</td></tr>').join('') + '</table>' + mvpHtml + scorersHtml(t));
     };
-    // آمار سنگین (۱۲+ تیم): اول اسکلت، بعد محتوا
     if (t.teams.length > 12 && !reducedMotion()) {
       box.insertAdjacentHTML('beforeend', skelBars(6));
       requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -512,7 +610,6 @@ const UI = (() => {
       }));
     } else paintStats();
   }
-  /* تایم‌لاین مسیر قهرمان تا جام */
   function champPathHtml(t) {
     const path = Engine.championPath(t);
     if (!path.length) return '';
@@ -520,19 +617,18 @@ const UI = (() => {
       path.map((p, i) =>
         '<div class="tl-row"><span class="tl-dot">' + (i === path.length - 1 ? '🏆' : '✅') + '</span>' +
         '<div class="tl-body"><div class="tl-title">' + esc(p.roundTitle) + '</div>' +
-        '<div class="tl-sub">برد ' + Export.scoreText(t, p.m) + ' مقابل ' + esc(Engine.teamName(t, p.opp)) + '</div></div></div>'
+        '<div class="tl-sub">برد ' + esc(Export.scoreText(t, p.m)) + ' مقابل ' + esc(Engine.teamName(t, p.opp)) + '</div></div></div>'
       ).join('') + '</div>';
   }
 
-  /* جدول گلزنان و پاسورها (فوتبال/فوتسال) */
   function scorersHtml(t) {
     const tab = Engine.scorersTable(t);
     if (!tab.length) {
       if (t.sport !== 'football' && t.sport !== 'futsal' && t.settings.scoring !== 'goals') return '';
-      return '<h3>⚽ گلزنان و پاسورها</h3><p style="color:var(--muted)">هنوز گلی ثبت نشده. از کارت هر بازی، گلزن‌ها را اضافه کن.</p>';
+      return '<h3 class="block-title">⚽ گلزنان و پاسورها</h3><p class="panel pad" style="color:var(--muted)">هنوز گلی ثبت نشده. از کارت هر بازی، گلزن‌ها را اضافه کن.</p>';
     }
     const top = tab[0];
-    return '<h3>⚽ گلزنان برتر</h3>' +
+    return '<h3 class="block-title">⚽ گلزنان برتر</h3>' +
       '<div class="champ"><div class="t">👟 آقای گل</div><div class="n">' + esc(top.name) + '</div>' +
       '<div class="t">' + esc(Engine.teamName(t, top.team)) + ' • ' + Engine.faNum(top.goals) + ' گل' + (top.assists ? ' • ' + Engine.faNum(top.assists) + ' پاس گل' : '') + '</div></div>' +
       '<table class="stats"><tr><th>#</th><th>بازیکن</th><th>تیم</th><th>⚽ گل</th><th>🅰️ پاس</th><th>بازی</th></tr>' +
@@ -548,7 +644,7 @@ const UI = (() => {
     $('setScoring').value = t.settings.scoring || 'goals';
     $('setSeries').value = String(t.settings.series || 1);
     $('setBye').value = t.settings.byeTo || 'top';
-    $('setTheme').checked = Store.db.theme === 'dark';
+    $('setTheme').checked = (Store.db.theme || 'dark') === 'dark';
   }
   function guardStructural(msg) {
     const t = Store.active();
@@ -575,16 +671,16 @@ const UI = (() => {
     Store.db.theme = $('setTheme').checked ? 'dark' : 'light';
     Store.save(); applyTheme();
   }
-  function applyTheme() { document.documentElement.dataset.theme = Store.db.theme || 'light'; }
+  function applyTheme() { document.documentElement.dataset.theme = Store.db.theme || 'dark'; }
   function resetBracket() {
     const t = Store.active(); if (!t || !t.rounds.length) return;
     if (!confirm('کل جدول و نتایج پاک شود؟')) return;
-    Engine.resetBracket(t); render();
+    Engine.resetBracket(t); currentRound = 0; overviewOn = false; render();
   }
   function deleteTournament() {
     const t = Store.active(); if (!t) return;
     if (!confirm('«' + t.name + '» برای همیشه حذف شود؟')) return;
-    Store.deleteTournament(t.id); render();
+    Store.deleteTournament(t.id); currentRound = 0; overviewOn = false; render();
   }
   function duplicateTournament() {
     const t = Store.active(); if (!t) return;
@@ -599,11 +695,9 @@ const UI = (() => {
     if (m) m.style.transform = '';
   }
 
-  /* ---------- موتور ژست‌ها (بدون کتابخانه) ---------- */
   function initGestures() {
     const modal = $('modal'), views = $('views'), ptr = $('ptr');
-
-    /* ۱. درگ شیت به پایین برای بستن */
+    if (!modal || !views) return;
     let sy = 0, dy = 0, dragging = false;
     modal.addEventListener('touchstart', e => {
       if (modal.scrollTop <= 0) { sy = e.touches[0].clientY; dragging = true; dy = 0; }
@@ -611,12 +705,11 @@ const UI = (() => {
     modal.addEventListener('touchmove', e => {
       if (!dragging) return;
       dy = e.touches[0].clientY - sy;
-      if (dy > 0) { modal.style.transform = 'translateY(' + Math.min(dy, 220) + 'px)'; modal.classList.add('dragging'); }
+      if (dy > 0) { modal.style.transform = 'translateY(' + Math.min(dy, 220) + 'px)'; }
     }, { passive: true });
     const endSheet = () => {
       if (!dragging) return;
       dragging = false;
-      modal.classList.remove('dragging');
       modal.style.transform = '';
       if (dy > 120) closeModal();
       dy = 0;
@@ -624,7 +717,6 @@ const UI = (() => {
     modal.addEventListener('touchend', endSheet);
     modal.addEventListener('touchcancel', endSheet);
 
-    /* ۲. سوایپ روی کارت بازی + ۳. لانگ‌پرس روی تیم */
     let tx = 0, ty = 0, tEl = null, lpTimer = null, lpFired = false;
     document.addEventListener('touchstart', e => {
       tEl = e.target.closest('.match-row') || null;
@@ -651,7 +743,6 @@ const UI = (() => {
       tEl = null;
     }, { passive: true });
 
-    /* ۴. پول‌تو‌ریفش */
     let py = 0, pulling = false;
     views.addEventListener('touchstart', e => {
       if (views.scrollTop <= 0) { py = e.touches[0].clientY; pulling = true; }
@@ -674,29 +765,31 @@ const UI = (() => {
     window.addEventListener('resize', () => moveTabInd());
   }
 
+  const dlg = (label, inner) => '<div style="margin-bottom:10px"><span class="label">' + label + '</span>' + inner + '</div>';
+
   function openTournamentDialog(edit) {
     const t = edit ? Store.active() : null;
     UI._tColor = t ? (t.color || '') : '';
     const swHtml = '<button type="button" class="sw auto' + (!UI._tColor ? ' sel' : '') + '" title="خودکار" onclick="UI.pickColor(this,\'\')"></button>' +
       SPORT_PALETTE.map(c => '<button type="button" class="sw' + (UI._tColor === c ? ' sel' : '') + '" style="background:' + c + '" onclick="UI.pickColor(this,\'' + c + '\')"></button>').join('');
     openModal('<h2>' + (t ? 'ویرایش تورنمنت' : 'تورنمنت جدید') + '</h2>' +
-      '<div class="field"><label>نام تورنمنت</label><input id="f_name" value="' + esc(t ? t.name : '') + '" placeholder="مثال: جام رمضان"></div>' +
-      '<div class="field"><label>رشته ورزشی</label><select id="f_sport">' +
-      Object.keys(SPORTS).map(k => '<option value="' + k + '"' + (t && t.sport === k ? ' selected' : '') + '>' + SPORTS[k] + '</option>').join('') + '</select></div>' +
-      '<div class="field"><label>ظرفیت جدول</label><select id="f_size">' +
-      [4, 8, 16, 32, 64].map(n => '<option value="' + n + '"' + (t && t.targetSize === n ? ' selected' : '') + '>' + n + ' تیم</option>').join('') + '</select></div>' +
-      '<div class="field"><label>تاریخ شروع</label><input type="date" id="f_start" value="' + (t ? t.startDate : '') + '"></div>' +
-      '<div class="field"><label>محل برگزاری</label><input id="f_place" value="' + esc(t ? t.place : '') + '"></div>' +
-      '<div class="field"><label>نوع امتیاز</label><select id="f_scoring">' +
-      [['goals', 'گل'], ['points', 'امتیاز'], ['sets', 'ست']].map(o => '<option value="' + o[0] + '"' + (t && t.settings.scoring === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div>' +
-      '<div class="field"><label>فرمت هر تقابل</label><select id="f_series">' +
-      [[1, 'تک‌بازی'], [3, 'بهترین از ۳'], [5, 'بهترین از ۵'], [7, 'بهترین از ۷']].map(o => '<option value="' + o[0] + '"' + (t && t.settings.series === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div>' +
-      '<div class="field"><label>قرعه استراحت</label><select id="f_bye">' +
+      dlg('نام تورنمنت', '<input id="f_name" class="field" value="' + esc(t ? t.name : '') + '" placeholder="مثال: جام رمضان">') +
+      dlg('رشته ورزشی', '<select id="f_sport" class="field">' +
+      Object.keys(SPORTS).map(k => '<option value="' + k + '"' + (t && t.sport === k ? ' selected' : '') + '>' + SPORTS[k] + '</option>').join('') + '</select>') +
+      dlg('ظرفیت جدول', '<select id="f_size" class="field">' +
+      [4, 8, 16, 32, 64].map(n => '<option value="' + n + '"' + (t && t.targetSize === n ? ' selected' : '') + '>' + n + ' تیم</option>').join('') + '</select>') +
+      dlg('تاریخ شروع', '<input type="date" id="f_start" class="field" value="' + (t ? (t.startDate || '') : '') + '">') +
+      dlg('محل برگزاری', '<input id="f_place" class="field" value="' + esc(t ? (t.place || '') : '') + '">') +
+      dlg('نوع امتیاز', '<select id="f_scoring" class="field">' +
+      [['goals', 'گل'], ['points', 'امتیاز'], ['sets', 'ست']].map(o => '<option value="' + o[0] + '"' + (t && t.settings.scoring === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>') +
+      dlg('فرمت هر تقابل', '<select id="f_series" class="field">' +
+      [[1, 'تک‌بازی'], [3, 'بهترین از ۳'], [5, 'بهترین از ۵'], [7, 'بهترین از ۷']].map(o => '<option value="' + o[0] + '"' + (t && t.settings.series === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>') +
+      dlg('قرعه استراحت', '<select id="f_bye" class="field">' +
       '<option value="top"' + (t && t.settings.byeTo === 'top' ? ' selected' : '') + '>به سیدهای بالا</option>' +
-      '<option value="random"' + (t && t.settings.byeTo === 'random' ? ' selected' : '') + '>تصادفی</option></select></div>' +
-      '<div class="field"><label>رنگ تورنمنت (خودکار = رنگ رشته)</label><div class="swatches" id="t_sw">' + swHtml + '</div></div>' +
-      '<div class="modal-btns"><button class="btn primary" onclick="UI.saveTournament(' + (t ? '\'' + t.id + '\'' : 'null') + ')">ذخیره</button>' +
-      '<button class="btn" onclick="UI.closeModal()">انصراف</button></div>');
+      '<option value="random"' + (t && t.settings.byeTo === 'random' ? ' selected' : '') + '>تصادفی</option></select>') +
+      dlg('رنگ تورنمنت (خودکار = رنگ رشته)', '<div class="swatches" id="t_sw">' + swHtml + '</div>') +
+      '<div class="modal-btns"><button class="action primary" onclick="UI.saveTournament(' + (t ? '\'' + t.id + '\'' : 'null') + ')">ذخیره</button>' +
+      '<button class="action" onclick="UI.closeModal()">انصراف</button></div>');
   }
   function pickColor(el, c) {
     UI._tColor = c || '';
@@ -726,14 +819,14 @@ const UI = (() => {
     const tm = teamId ? teamById(t, teamId) : null;
     UI._teamPhoto = tm ? tm.photo : null;
     openModal('<h2>' + (tm ? 'ویرایش تیم' : 'تیم جدید') + '</h2>' +
-      '<div class="field"><label>نام تیم / بازیکن</label><input id="tm_name" value="' + esc(tm ? tm.name : '') + '"></div>' +
-      '<div class="field"><label>مربی / سرپرست</label><input id="tm_coach" value="' + esc(tm ? tm.coach : '') + '"></div>' +
-      '<div class="field"><label>تلفن</label><input id="tm_phone" inputmode="tel" value="' + esc(tm ? tm.phone : '') + '"></div>' +
-      '<div class="field"><label>سید / رنکینگ (۱ = قوی‌ترین؛ عدد بزرگ‌تر = ضعیف‌تر)</label><input id="tm_rank" type="number" min="1" value="' + (tm ? tm.rank : '') + '" placeholder="مثلاً ۱"></div>' +
-      '<div class="field"><label>لوگو / عکس تیم</label><input type="file" id="tm_photo" accept="image/*" onchange="UI.onPhotoInput(this,\'tm_prev\',\'_teamPhoto\')">' +
-      '<img id="tm_prev" class="photo-prev' + (UI._teamPhoto ? '' : ' hidden') + '" src="' + (UI._teamPhoto || '') + '"></div>' +
-      '<div class="modal-btns"><button class="btn primary" onclick="UI.saveTeam(\'' + t.id + '\',' + (tm ? '\'' + tm.id + '\'' : 'null') + ')">ذخیره</button>' +
-      '<button class="btn" onclick="UI.closeModal()">انصراف</button></div>');
+      dlg('نام تیم / بازیکن', '<input id="tm_name" class="field" value="' + esc(tm ? tm.name : '') + '">') +
+      dlg('مربی / سرپرست', '<input id="tm_coach" class="field" value="' + esc(tm ? (tm.coach || '') : '') + '">') +
+      dlg('تلفن', '<input id="tm_phone" class="field" inputmode="tel" value="' + esc(tm ? (tm.phone || '') : '') + '">') +
+      dlg('سید / رنکینگ (۱ = قوی‌ترین)', '<input id="tm_rank" class="field" type="number" min="1" value="' + (tm && tm.rank ? tm.rank : '') + '" placeholder="مثلاً ۱">') +
+      dlg('لوگو / عکس تیم', '<input type="file" id="tm_photo" class="field" accept="image/*" onchange="UI.onPhotoInput(this,\'tm_prev\',\'_teamPhoto\')">' +
+      '<img id="tm_prev" class="photo-prev' + (UI._teamPhoto ? '' : ' hidden') + '" src="' + (UI._teamPhoto || '') + '">') +
+      '<div class="modal-btns"><button class="action primary" onclick="UI.saveTeam(\'' + t.id + '\',' + (tm ? '\'' + tm.id + '\'' : 'null') + ')">ذخیره</button>' +
+      '<button class="action" onclick="UI.closeModal()">انصراف</button></div>');
   }
   function saveTeam(tid, teamId) {
     const d = { name: $('tm_name').value, coach: $('tm_coach').value, phone: $('tm_phone').value, rank: $('tm_rank').value, photo: UI._teamPhoto || null };
@@ -744,10 +837,11 @@ const UI = (() => {
 
   function openBulkDialog() {
     const t = Store.active(); if (!t) return;
-    openModal('<h2>افزودن گروهی</h2><div class="field"><label>هر خط یک تیم (یا فایل CSV با ستون نام)</label><textarea id="bulk" rows="8" placeholder="استقلال\nپرسپولیس\nسپاهان"></textarea></div>' +
-      '<div class="field"><input type="file" id="bulkFile" accept=".csv,.txt" onchange="UI.bulkFile(this)"></div>' +
-      '<div class="modal-btns"><button class="btn primary" onclick="UI.saveBulk(\'' + t.id + '\')">افزودن</button>' +
-      '<button class="btn" onclick="UI.closeModal()">انصراف</button></div>');
+    openModal('<h2>افزودن گروهی</h2>' +
+      dlg('هر خط یک تیم (یا فایل CSV با ستون نام)', '<textarea id="bulk" class="field" rows="8" placeholder="استقلال\nپرسپولیس\nسپاهان"></textarea>') +
+      '<div style="margin-bottom:10px"><input type="file" id="bulkFile" class="field" accept=".csv,.txt" onchange="UI.bulkFile(this)"></div>' +
+      '<div class="modal-btns"><button class="action primary" onclick="UI.saveBulk(\'' + t.id + '\')">افزودن</button>' +
+      '<button class="action" onclick="UI.closeModal()">انصراف</button></div>');
   }
   function bulkFile(input) {
     const f = input.files && input.files[0];
@@ -775,19 +869,19 @@ const UI = (() => {
     drawMethod = 'random'; manualOrder = t.teams.map(x => x.id);
     const slots = Engine.nextPow2(t.teams.length);
     openModal('<h2>قرعه‌کشی (' + Engine.faNum(t.teams.length) + ' تیم → جدول ' + Engine.faNum(slots) + ')' + (slots !== t.teams.length ? '<br><small style="color:var(--muted)">' + Engine.faNum(slots - t.teams.length) + ' قرعه استراحت (BYE)</small>' : '') + '</h2>' +
-      '<div class="field"><label>روش قرعه‌کشی</label><select id="draw_method" onchange="UI.drawPreview()">' +
-      '<option value="random">تصادفی استاندارد (۱ با آخر، ۲ با یکی‌مانده به آخر...)</option>' +
+      dlg('روش قرعه‌کشی', '<select id="draw_method" class="field" onchange="UI.drawPreview()">' +
+      '<option value="random">تصادفی استاندارد</option>' +
       '<option value="ranked">سیدی (۱ قوی‌ترین)</option>' +
       '<option value="pro">حرفه‌ای تنیسی (۱ و ۲ جدا، بقیه تصادفی)</option>' +
       '<option value="sequential">ترتیبی (۱ با ۲، ۳ با ۴...)</option>' +
-      '<option value="manual">دستی (ترتیب دلخواه با ▲▼)</option></select></div>' +
-      '<div class="field"><label>قرعه استراحت</label><select id="draw_bye">' +
+      '<option value="manual">دستی (ترتیب دلخواه با ▲▼)</option></select>') +
+      dlg('قرعه استراحت', '<select id="draw_bye" class="field">' +
       '<option value="top"' + ((t.settings.byeTo || 'top') === 'top' ? ' selected' : '') + '>به سیدهای بالا</option>' +
-      '<option value="random"' + (t.settings.byeTo === 'random' ? ' selected' : '') + '>تصادفی</option></select></div>' +
+      '<option value="random"' + (t.settings.byeTo === 'random' ? ' selected' : '') + '>تصادفی</option></select>') +
       '<div id="drawPreview" class="seed-list"></div>' +
-      '<div class="modal-btns"><button class="btn primary" onclick="UI.doDraw()">تأیید و ساخت جدول</button>' +
-      '<button class="btn" onclick="UI.closeModal()">انصراف</button></div>' +
-      (t.rounds.length ? '<button class="btn small" style="margin-top:8px" onclick="UI.openSwapDialog()">🔀 جابجایی دستی دو تیم (بدون قرعه مجدد)</button>' : ''));
+      '<div class="modal-btns"><button class="action primary" onclick="UI.doDraw()">تأیید و ساخت جدول</button>' +
+      '<button class="action" onclick="UI.closeModal()">انصراف</button></div>' +
+      (t.rounds.length ? '<button class="action small" style="margin-top:8px;width:100%" onclick="UI.openSwapDialog()">🔀 جابجایی دستی دو تیم (بدون قرعه مجدد)</button>' : ''));
     drawPreview();
   }
   function drawPreview() {
@@ -809,7 +903,6 @@ const UI = (() => {
     const j = i + d;
     if (j < 0 || j >= manualOrder.length) return;
     [manualOrder[i], manualOrder[j]] = [manualOrder[j], manualOrder[i]];
-    // بازسازی ترتیب نمایشی بر اساس manualOrder
     const arr = manualOrder.map(id => teamById(t, id)).filter(Boolean);
     $('drawPreview').innerHTML = arr.map((tm, k) =>
       '<div class="seed-item"><span class="pos">' + Engine.faNum(k + 1) + '</span><span class="nm">' + esc(tm.name) + '</span>' +
@@ -822,17 +915,17 @@ const UI = (() => {
       t.teams.sort((a, b) => manualOrder.indexOf(a.id) - manualOrder.indexOf(b.id));
     }
     t.settings.byeTo = $('draw_bye').value;
-    if (Engine.generateBracket(t, drawMethod)) { buzz(25); closeModal(); switchView('bracket'); }
+    if (Engine.generateBracket(t, drawMethod)) { buzz(25); closeModal(); currentRound = 0; overviewOn = false; switchView('bracket'); }
   }
 
   function openSwapDialog() {
     const t = Store.active(); if (!t || !t.rounds.length) return;
     const opts = t.teams.map(tm => '<option value="' + tm.id + '">' + esc(tm.name) + '</option>').join('');
     openModal('<h2>جابجایی دو تیم</h2><p style="font-size:13px;color:var(--muted)">نتایج ثبت‌شده پاک می‌شود.</p>' +
-      '<div class="field"><label>تیم اول</label><select id="sw_a">' + opts + '</select></div>' +
-      '<div class="field"><label>تیم دوم</label><select id="sw_b">' + opts + '</select></div>' +
-      '<div class="modal-btns"><button class="btn primary" onclick="UI.doSwap()">جابجا کن</button>' +
-      '<button class="btn" onclick="UI.closeModal()">انصراف</button></div>');
+      dlg('تیم اول', '<select id="sw_a" class="field">' + opts + '</select>') +
+      dlg('تیم دوم', '<select id="sw_b" class="field">' + opts + '</select>') +
+      '<div class="modal-btns"><button class="action primary" onclick="UI.doSwap()">جابجا کن</button>' +
+      '<button class="action" onclick="UI.closeModal()">انصراف</button></div>');
   }
   function doSwap() {
     const t = Store.active();
@@ -842,7 +935,6 @@ const UI = (() => {
     closeModal(); render();
   }
 
-  /* ---------- دیالوگ بازی فوق‌حرفه‌ای ---------- */
   function gameUnitLabel(t) {
     return t.settings.scoring === 'sets' ? 'ست' : t.settings.scoring === 'points' ? 'دست' : 'بازی';
   }
@@ -864,27 +956,28 @@ const UI = (() => {
       for (let i = 0; i < series; i++) {
         const g = (m.games && m.games[i]) || {};
         scoreHtml += '<div class="game-row"><span class="gl">' + unit + ' ' + Engine.faNum(i + 1) + '</span>' +
-          '<input id="gm_a_' + i + '" type="number" min="0" placeholder="' + esc(aN) + '" value="' + (g.a === null || g.a === undefined ? '' : g.a) + '">' +
+          '<input id="gm_a_' + i + '" class="field" type="number" min="0" placeholder="' + esc(aN) + '" value="' + (g.a === null || g.a === undefined ? '' : g.a) + '">' +
           '<span>-</span>' +
-          '<input id="gm_b_' + i + '" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (g.b === null || g.b === undefined ? '' : g.b) + '"></div>';
+          '<input id="gm_b_' + i + '" class="field" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (g.b === null || g.b === undefined ? '' : g.b) + '"></div>';
       }
       scoreHtml += '</div>';
     } else if (t.settings.scoring === 'goals') {
       scoreHtml = '<div id="scoreBox">' +
-        '<div class="field"><label>' + sc + ' ۹۰ دقیقه ' + esc(aN) + '</label><input id="mt_a" type="number" min="0" value="' + (m.scoreA === null ? '' : m.scoreA) + '"></div>' +
-        '<div class="field"><label>' + sc + ' ۹۰ دقیقه ' + esc(bN) + '</label><input id="mt_b" type="number" min="0" value="' + (m.scoreB === null ? '' : m.scoreB) + '"></div>' +
-        '<div class="field"><label>' + sc + ' وقت اضافه (اختیاری، فقط هنگام تساوی)</label><div style="display:flex;gap:6px">' +
-        '<input id="mt_ea" type="number" min="0" placeholder="' + esc(aN) + '" value="' + (m.etA === null || m.etA === undefined ? '' : m.etA) + '">' +
-        '<input id="mt_eb" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (m.etB === null || m.etB === undefined ? '' : m.etB) + '"></div></div>' +
-        '<div class="field"><label>پنالتی (فقط در صورت تساوی نهایی)</label><div style="display:flex;gap:6px">' +
-        '<input id="mt_pa" type="number" min="0" placeholder="' + esc(aN) + '" value="' + (m.penA === null || m.penA === undefined ? '' : m.penA) + '">' +
-        '<input id="mt_pb" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (m.penB === null || m.penB === undefined ? '' : m.penB) + '"></div></div></div>';
+        dlg(sc + ' ۹۰ دقیقه — ' + aN, '<input id="mt_a" class="field" type="number" min="0" value="' + (m.scoreA === null || m.scoreA === undefined ? '' : m.scoreA) + '">') +
+        dlg(sc + ' ۹۰ دقیقه — ' + bN, '<input id="mt_b" class="field" type="number" min="0" value="' + (m.scoreB === null || m.scoreB === undefined ? '' : m.scoreB) + '">') +
+        '<div style="margin-bottom:10px"><span class="label">' + sc + ' وقت اضافه (فقط هنگام تساوی)</span><div style="display:flex;gap:6px">' +
+        '<input id="mt_ea" class="field" type="number" min="0" placeholder="' + esc(aN) + '" value="' + (m.etA === null || m.etA === undefined ? '' : m.etA) + '">' +
+        '<input id="mt_eb" class="field" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (m.etB === null || m.etB === undefined ? '' : m.etB) + '"></div></div>' +
+        '<div style="margin-bottom:10px"><span class="label">پنالتی (فقط در صورت تساوی نهایی)</span><div style="display:flex;gap:6px">' +
+        '<input id="mt_pa" class="field" type="number" min="0" placeholder="' + esc(aN) + '" value="' + (m.penA === null || m.penA === undefined ? '' : m.penA) + '">' +
+        '<input id="mt_pb" class="field" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (m.penB === null || m.penB === undefined ? '' : m.penB) + '"></div></div></div>';
     } else {
-      scoreHtml = '<div id="scoreBox"><div class="field"><label>' + sc + ' ' + esc(aN) + '</label><input id="mt_a" type="number" min="0" value="' + (m.scoreA === null ? '' : m.scoreA) + '"></div>' +
-        '<div class="field"><label>' + sc + ' ' + esc(bN) + '</label><input id="mt_b" type="number" min="0" value="' + (m.scoreB === null ? '' : m.scoreB) + '"></div>' +
-        '<div class="field"><label>پنالتی (فقط در صورت تساوی)</label><div style="display:flex;gap:6px">' +
-        '<input id="mt_pa" type="number" min="0" placeholder="' + esc(aN) + '" value="' + (m.penA === null || m.penA === undefined ? '' : m.penA) + '">' +
-        '<input id="mt_pb" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (m.penB === null || m.penB === undefined ? '' : m.penB) + '"></div></div></div>';
+      scoreHtml = '<div id="scoreBox">' +
+        dlg(sc + ' — ' + aN, '<input id="mt_a" class="field" type="number" min="0" value="' + (m.scoreA === null || m.scoreA === undefined ? '' : m.scoreA) + '">') +
+        dlg(sc + ' — ' + bN, '<input id="mt_b" class="field" type="number" min="0" value="' + (m.scoreB === null || m.scoreB === undefined ? '' : m.scoreB) + '">') +
+        '<div style="margin-bottom:10px"><span class="label">پنالتی (فقط در صورت تساوی)</span><div style="display:flex;gap:6px">' +
+        '<input id="mt_pa" class="field" type="number" min="0" placeholder="' + esc(aN) + '" value="' + (m.penA === null || m.penA === undefined ? '' : m.penA) + '">' +
+        '<input id="mt_pb" class="field" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (m.penB === null || m.penB === undefined ? '' : m.penB) + '"></div></div></div>';
     }
 
     const c = m.cards || {};
@@ -893,9 +986,9 @@ const UI = (() => {
     const mvpStatHtml = meta.mvpStats.map(s => {
       const v = (mv.stats && mv.stats[s.key]) || 0;
       const input = s.type === 'check'
-        ? '<select id="ms_' + s.key + '"><option value="0"' + (!v ? ' selected' : '') + '>ندارد</option><option value="1"' + (v ? ' selected' : '') + '>دارد</option></select>'
-        : '<input id="ms_' + s.key + '" type="number" min="0" value="' + v + '">';
-      return '<label style="flex:1;min-width:70px;font-size:11px">' + s.label + input + '</label>';
+        ? '<select id="ms_' + s.key + '" class="field"><option value="0"' + (!v ? ' selected' : '') + '>ندارد</option><option value="1"' + (v ? ' selected' : '') + '>دارد</option></select>'
+        : '<input id="ms_' + s.key + '" class="field" type="number" min="0" value="' + v + '">';
+      return '<label style="flex:1;min-width:80px;font-size:11px">' + s.label + input + '</label>';
     }).join('');
     const showScorers = (t.sport === 'football' || t.sport === 'futsal' || t.settings.scoring === 'goals') && series === 1 && canPlay;
     UI._scorers = Array.isArray(m.scorers) ? JSON.parse(JSON.stringify(m.scorers)) : [];
@@ -903,43 +996,43 @@ const UI = (() => {
     openModal('<h2>' + esc(aN) + ' — ' + esc(bN) + '</h2>' +
       '<p style="font-size:12px;color:var(--muted)">' + (num ? 'بازی ' + Engine.faNum(num) + ' • ' : '') + esc((m.title || '') + ' • وضعیت: ' + (m.status === 'done' ? 'تمام‌شده' : 'زمان‌بندی‌شده')) + '</p>' +
       (m.result && m.result.type === 'bye' ? '<p>این بازی با قرعه استراحت تعیین شد.</p>' :
-      '<div class="field"><label>نوع نتیجه</label><select id="mt_type" onchange="UI.matchTypeToggle()">' +
+      dlg('نوع نتیجه', '<select id="mt_type" class="field" onchange="UI.matchTypeToggle()">' +
         '<option value="score">نتیجه عادی</option>' +
         '<option value="walkover">انصراف یک تیم</option>' +
-        '<option value="dq">حذف انضباطی</option></select></div>' + scoreHtml +
-      '<div id="winnerBox" class="field hidden"><label>تیم صعودکننده</label><select id="mt_w">' +
+        '<option value="dq">حذف انضباطی</option></select>') + scoreHtml +
+      '<div id="winnerBox" class="hidden" style="margin-bottom:10px"><span class="label">تیم صعودکننده</span><select id="mt_w" class="field">' +
         (canPlay ? '<option value="' + m.a + '">' + esc(aN) + '</option><option value="' + m.b + '">' + esc(bN) + '</option>' : '') + '</select></div>' +
-      '<div class="field"><label>کارت‌ها (زرد / قرمز هر تیم)</label><div class="cards4">' +
+      '<div style="margin-bottom:10px"><span class="label">کارت‌ها (زرد / قرمز هر تیم)</span><div class="cards4">' +
         '<label>🟨 ' + esc(aN.slice(0, 8)) + '<input id="mt_ya" type="number" min="0" value="' + (c.ya || 0) + '"></label>' +
         '<label>🟨 ' + esc(bN.slice(0, 8)) + '<input id="mt_yb" type="number" min="0" value="' + (c.yb || 0) + '"></label>' +
         '<label>🟥 ' + esc(aN.slice(0, 8)) + '<input id="mt_ra" type="number" min="0" value="' + (c.ra || 0) + '"></label>' +
         '<label>🟥 ' + esc(bN.slice(0, 8)) + '<input id="mt_rb" type="number" min="0" value="' + (c.rb || 0) + '"></label></div></div>' +
-      '<div class="field"><label>⭐ بهترین بازیکن میدان (' + meta.name + ')</label><input id="mt_mvp" value="' + esc(mv.name || '') + '" placeholder="نام بازیکن">' +
-      '<div style="display:flex;gap:6px;margin-top:6px"><select id="mt_mvp_team" style="flex:1">' +
+      dlg('⭐ بهترین بازیکن میدان (' + meta.name + ')', '<input id="mt_mvp" class="field" value="' + esc(mv.name || '') + '" placeholder="نام بازیکن">') +
+      '<div style="display:flex;gap:6px;margin:-4px 0 10px"><select id="mt_mvp_team" class="field" style="flex:1">' +
       '<option value="">تیم: نامشخص</option>' +
       (canPlay ? '<option value="' + m.a + '"' + (mv.team === m.a ? ' selected' : '') + '>' + esc(aN) + '</option><option value="' + m.b + '"' + (mv.team === m.b ? ' selected' : '') + '>' + esc(bN) + '</option>' : '') +
       '</select></div>' +
-      '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">' + mvpStatHtml + '</div></div>') +
-      (showScorers ? '<div class="field"><label>⚽ گلزن‌ها و پاسورها</label><div id="scorerList"></div>' +
-      '<button class="btn small" type="button" onclick="UI.addScorerRow()">＋ افزودن بازیکن</button>' +
+      '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">' + mvpStatHtml + '</div>') +
+      (showScorers ? '<div style="margin-bottom:10px"><span class="label">⚽ گلزن‌ها و پاسورها</span><div id="scorerList"></div>' +
+      '<button class="action small" type="button" onclick="UI.addScorerRow()">＋ افزودن بازیکن</button>' +
       '<div id="scorerWarn" style="font-size:12px;color:var(--muted);margin-top:4px"></div></div>' : '') +
-      '<div class="field"><label>توضیحات</label><input id="mt_note" value="' + esc(m.result ? m.result.note || '' : '') + '"></div>' +
-      '<div class="field"><label>📎 ضمیمه (عکس سند نتیجه)</label><input type="file" id="mt_photo" accept="image/*" onchange="UI.onPhotoInput(this,\'mt_prev\',\'_matchPhoto\')">' +
+      dlg('توضیحات', '<input id="mt_note" class="field" value="' + esc(m.result ? m.result.note || '' : '') + '">') +
+      dlg('📎 ضمیمه (عکس سند نتیجه)', '<input type="file" id="mt_photo" class="field" accept="image/*" onchange="UI.onPhotoInput(this,\'mt_prev\',\'_matchPhoto\')">' +
       '<img id="mt_prev" class="photo-prev' + (UI._matchPhoto ? '' : ' hidden') + '" src="' + (UI._matchPhoto || '') + '">' +
-      (UI._matchPhoto ? '<button class="btn small" onclick="UI.clearMatchPhoto()">حذف ضمیمه</button>' : '') + '</div>' +
-      '<h2 style="margin-top:10px">زمان‌بندی</h2>' +
-      '<div class="field"><label>تاریخ</label><input type="date" id="mt_date" value="' + (m.date || '') + '"></div>' +
-      '<div class="field"><label>ساعت</label><input type="time" id="mt_time" value="' + (m.time || '') + '"></div>' +
-      '<div class="field"><label>محل</label><input id="mt_place" value="' + esc(m.place || '') + '"></div>' +
-      '<div class="field"><label>داور</label><input id="mt_ref" value="' + esc(m.ref || '') + '"></div>' +
+      (UI._matchPhoto ? '<button class="action small" style="margin-top:6px" onclick="UI.clearMatchPhoto()">حذف ضمیمه</button>' : '')) +
+      '<h2 style="margin-top:14px">زمان‌بندی</h2>' +
+      dlg('تاریخ', '<input type="date" id="mt_date" class="field" value="' + (m.date || '') + '">') +
+      dlg('ساعت', '<input type="time" id="mt_time" class="field" value="' + (m.time || '') + '">') +
+      dlg('محل', '<input id="mt_place" class="field" value="' + esc(m.place || '') + '">') +
+      dlg('داور', '<input id="mt_ref" class="field" value="' + esc(m.ref || '') + '">') +
       '<div class="modal-btns">' +
-      (canPlay && !(m.result && m.result.type === 'bye') ? '<button class="btn primary" onclick="UI.saveMatchResult(\'' + m.id + '\')">ثبت نتیجه</button>' : '') +
-      '<button class="btn" onclick="UI.saveMatchSchedule(\'' + m.id + '\')">ذخیره زمان‌بندی</button></div>' +
+      (canPlay && !(m.result && m.result.type === 'bye') ? '<button class="action primary" onclick="UI.saveMatchResult(\'' + m.id + '\')">ثبت نتیجه</button>' : '') +
+      '<button class="action" onclick="UI.saveMatchSchedule(\'' + m.id + '\')">ذخیره زمان‌بندی</button></div>' +
       '<div class="modal-btns">' +
-      (m.status === 'done' && !(m.result && m.result.type === 'bye') ? '<button class="btn small danger" onclick="UI.clearMatch(\'' + m.id + '\')">↩ پاک کردن نتیجه</button>' : '') +
-      '<button class="btn small" onclick="Export.pngMatch(\'' + m.id + '\')">🖼️</button>' +
-      '<button class="btn small" onclick="UI.toggleLock(\'' + m.id + '\')">' + (m.locked ? '🔓 باز کردن' : '🔒 قفل') + '</button>' +
-      '<button class="btn small" onclick="UI.closeModal()">بستن</button></div>');
+      (m.status === 'done' && !(m.result && m.result.type === 'bye') ? '<button class="action small danger" onclick="UI.clearMatch(\'' + m.id + '\')">↩ پاک کردن نتیجه</button>' : '') +
+      '<button class="action small" onclick="Export.pngMatch(\'' + m.id + '\')">🖼️</button>' +
+      '<button class="action small" onclick="UI.toggleLock(\'' + m.id + '\')">' + (m.locked ? '🔓 باز کردن' : '🔒 قفل') + '</button>' +
+      '<button class="action small" onclick="UI.closeModal()">بستن</button></div>');
     if (showScorers) renderScorerRows();
   }
   function clearMatchPhoto() {
@@ -947,7 +1040,6 @@ const UI = (() => {
     const p = $('mt_prev');
     if (p) { p.src = ''; p.classList.add('hidden'); }
   }
-  /* ---------- گلزن‌ها و پاسورها ---------- */
   function scorerTeamOptions(sel) {
     const ctx = UI._scCtx || {};
     const opt = (id, nm) => '<option value="' + id + '"' + (sel === id ? ' selected' : '') + '>' + esc(nm || '') + '</option>';
@@ -956,12 +1048,11 @@ const UI = (() => {
   function renderScorerRows() {
     const box = $('scorerList');
     if (!box) return;
-    const ctx = UI._scCtx || {};
     box.innerHTML = (UI._scorers || []).map((s, i) =>
-      '<div class="game-row"><input value="' + esc(s.name || '') + '" placeholder="نام بازیکن" style="flex:2" oninput="UI.syncScorer(' + i + ',\'name\',this)">' +
-      '<select style="flex:1.4" onchange="UI.syncScorer(' + i + ',\'team\',this)">' + scorerTeamOptions(s.team) + '</select>' +
-      '<input type="number" min="0" style="width:52px" title="گل" placeholder="⚽" value="' + (s.goals || 0) + '" oninput="UI.syncScorer(' + i + ',\'goals\',this)">' +
-      '<input type="number" min="0" style="width:52px" title="پاس گل" placeholder="🅰️" value="' + (s.assists || 0) + '" oninput="UI.syncScorer(' + i + ',\'assists\',this)">' +
+      '<div class="game-row"><input class="field" value="' + esc(s.name || '') + '" placeholder="نام بازیکن" style="flex:2" oninput="UI.syncScorer(' + i + ',\'name\',this)">' +
+      '<select class="field" style="flex:1.4" onchange="UI.syncScorer(' + i + ',\'team\',this)">' + scorerTeamOptions(s.team) + '</select>' +
+      '<input class="field" type="number" min="0" style="max-width:58px" title="گل" placeholder="⚽" value="' + (s.goals || 0) + '" oninput="UI.syncScorer(' + i + ',\'goals\',this)">' +
+      '<input class="field" type="number" min="0" style="max-width:58px" title="پاس گل" placeholder="🅰️" value="' + (s.assists || 0) + '" oninput="UI.syncScorer(' + i + ',\'assists\',this)">' +
       '<button class="mini" type="button" onclick="UI.delScorerRow(' + i + ')">🗑️</button></div>'
     ).join('') || '<p style="font-size:12px;color:var(--muted)">هنوز ثبت نشده.</p>';
     updateScorerWarn();
@@ -970,7 +1061,6 @@ const UI = (() => {
     const w = $('scorerWarn');
     if (!w) return;
     const ctx = UI._scCtx || {};
-    // جمع گل‌های ثبت‌شده هر تیم در برابر نتیجه بازی
     const m = { a: 0, b: 0 };
     (UI._scorers || []).forEach(s => {
       const g = parseInt(s.goals, 10) || 0;
@@ -984,7 +1074,7 @@ const UI = (() => {
     if (ta !== null && m.a > ta + ea) notes.push('گل‌های ' + (ctx.aN || '') + ' (' + Engine.faNum(m.a) + ') بیشتر از نتیجه (' + Engine.faNum(ta + ea) + ') است');
     if (tb !== null && m.b > tb + eb) notes.push('گل‌های ' + (ctx.bN || '') + ' (' + Engine.faNum(m.b) + ') بیشتر از نتیجه (' + Engine.faNum(tb + eb) + ') است');
     w.textContent = notes.join(' • ');
-    w.style.color = notes.length ? '#dc2626' : 'var(--muted)';
+    w.style.color = notes.length ? '#f87171' : 'var(--muted)';
   }
   function addScorerRow() {
     UI._scorers = UI._scorers || [];
@@ -1044,7 +1134,7 @@ const UI = (() => {
       d.scorers = (UI._scorers || []).filter(s => String(s.name || '').trim()).map(s => ({ name: s.name, team: s.team, goals: s.goals, assists: s.assists }));
       if (UI._matchPhoto !== undefined && UI._matchPhoto !== null) d.photo = UI._matchPhoto;
     } else d.winner = $('mt_w').value;
-    d.note = $('mt_note').value;
+    d.note = $('mt_note') ? $('mt_note').value : '';
     if (Engine.setResult(t, id, d)) { UI._matchPhoto = null; buzz(25); closeModal(); render(); }
   }
   function clearMatch(id) {
@@ -1061,7 +1151,7 @@ const UI = (() => {
   }
 
   return {
-    switchView, render, renderMatches, toggleBracketMode,
+    switchView, render, renderTeams, renderMatches, toggleBracketMode, showRound, toggleOverview, openToolsDialog,
     selectTournament, openDrawer, closeDrawer,
     openTournamentDialog, saveTournament, openTeamDialog, saveTeam, removeTeam,
     openBulkDialog, saveBulk, bulkFile, openDrawDialog, drawPreview, manualMove, doDraw,

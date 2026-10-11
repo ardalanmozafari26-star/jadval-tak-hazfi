@@ -30,13 +30,13 @@ const Export = (() => {
     cv.width = W * scale; cv.height = H * scale;
     const c = cv.getContext('2d');
     c.scale(scale, scale);
-    const dark = document.documentElement.dataset.theme === 'dark';
-    c.fillStyle = dark ? '#0f172a' : '#ffffff';
+    const dark = document.documentElement.dataset.theme !== 'light';
+    c.fillStyle = dark ? '#0e1116' : '#ffffff';
     c.fillRect(0, 0, W, H);
     c.textAlign = 'center';
 
     // عنوان
-    c.fillStyle = dark ? '#f1f5f9' : '#0f172a';
+    c.fillStyle = dark ? '#f1f4f7' : '#0e1116';
     c.font = 'bold 26px Tahoma';
     c.fillText(t.name, W / 2, 30);
 
@@ -49,7 +49,7 @@ const Export = (() => {
 
     rounds.forEach((rd, r) => {
       const x = pad + r * (colW + gap);
-      c.fillStyle = '#16a34a';
+      c.fillStyle = dark ? '#c4f35b' : '#65a30d';
       c.font = 'bold 15px Tahoma';
       c.fillText(rd.title, x + colW / 2, pad + 4);
       rd.matches.forEach((m, i) => {
@@ -67,8 +67,8 @@ const Export = (() => {
           c.stroke();
         }
         // کادر بازی
-        c.fillStyle = dark ? '#1e293b' : '#f1f5f9';
-        c.strokeStyle = m.status === 'done' ? '#16a34a' : '#94a3b8';
+        c.fillStyle = dark ? '#181e26' : '#f1f5f9';
+        c.strokeStyle = m.status === 'done' ? (dark ? '#c4f35b' : '#65a30d') : '#94a3b8';
         c.lineWidth = 2;
         roundRect(c, x, y, colW, rowH, 10); c.fill(); c.stroke();
         const w = m.status === 'done' && m.result ? m.result.winner : null;
@@ -84,9 +84,9 @@ const Export = (() => {
   }
 
   function drawSide(c, t, teamId, score, x, y, colW, isWin, bottom) {
-    const dark = document.documentElement.dataset.theme === 'dark';
+    const dark = document.documentElement.dataset.theme !== 'light';
     const nm = !teamId ? '...' : teamId === 'BYE' ? 'استراحت' : (t.teams.find(v => v.id === teamId) || {}).name || '?';
-    c.fillStyle = isWin ? '#16a34a' : (dark ? '#e2e8f0' : '#0f172a');
+    c.fillStyle = isWin ? (dark ? '#c4f35b' : '#65a30d') : (dark ? '#e2e8f0' : '#0f172a');
     c.font = (isWin ? 'bold ' : '') + '14px Tahoma';
     const yy = y + (bottom ? 0 : rowHpad()) + 20;
     c.fillText(nm.length > 22 ? nm.slice(0, 22) + '…' : nm, x + colW / 2, yy, colW - 16);
@@ -111,11 +111,11 @@ const Export = (() => {
 
   /* ---------- خروجی عکس عمومی از هر داده ---------- */
   function pal() {
-    const dark = document.documentElement.dataset.theme === 'dark';
+    const dark = document.documentElement.dataset.theme !== 'light';
     return {
-      dark, bg: dark ? '#0f172a' : '#ffffff', card: dark ? '#1e293b' : '#f1f5f9',
-      text: dark ? '#f1f5f9' : '#0f172a', muted: dark ? '#94a3b8' : '#64748b',
-      accent: '#16a34a', gold: '#ca8a04'
+      dark, bg: dark ? '#0e1116' : '#ffffff', card: dark ? '#181e26' : '#f1f5f9',
+      text: dark ? '#f1f4f7' : '#0e1116', muted: dark ? '#a3adba' : '#64748b',
+      accent: dark ? '#c4f35b' : '#65a30d', gold: '#ca8a04'
     };
   }
   const cut = (s, n) => { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n) + '…' : s; };

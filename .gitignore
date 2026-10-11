@@ -4,4 +4,10 @@ android/.gradle/
 apk/
 dist/
 exefile/
+keystore/
+release.keystore
+release-apk/
+preview/
+myket-shots/
 *.log
+release-apk/
