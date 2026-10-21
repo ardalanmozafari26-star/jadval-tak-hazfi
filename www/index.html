@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+<a class="skip-link" href="#views">پرش به محتوای اصلی</a>
 <div id="splash">
   <div class="splash-box">
     <div class="splash-icon">🏆</div>
@@ -26,7 +27,10 @@
         <small>مدیریت تورنمنت‌ها</small>
       </span>
     </div>
-    <button id="menuBtn" class="icon-btn" aria-label="فهرست تورنمنت‌ها">☰</button>
+    <div class="appbar-actions">
+      <button id="themeBtn" class="icon-btn" aria-label="تغییر تم روشن و تیره" title="تغییر تم">🌙</button>
+      <button id="menuBtn" class="icon-btn" aria-label="فهرست تورنمنت‌ها">☰</button>
+    </div>
   </header>
 
   <div id="ptr" class="hidden">⟳ رها کن برای تازه‌سازی</div>
@@ -59,14 +63,15 @@
       </div>
       <div id="homeContent" class="hidden">
         <div id="homeDash"></div>
+        <div id="homeQuick" class="quick-actions"></div>
         <p class="section-sub">نمای کلی تورنمنت</p>
         <h2 class="section-title">خانه<span class="dot-accent">.</span></h2>
         <div class="cards-row" id="homeStats"></div>
-        <h3 class="block-title">بازی‌های امروز</h3>
+        <h3 class="block-title" id="homeTodayTitle">بازی‌های امروز</h3>
         <div id="homeToday" class="stack"></div>
-        <h3 class="block-title">بازی‌های پیش رو</h3>
+        <h3 class="block-title" id="homeUpcomingTitle">بازی‌های پیش رو</h3>
         <div id="homeUpcoming" class="stack"></div>
-        <h3 class="block-title">آخرین نتایج</h3>
+        <h3 class="block-title" id="homeRecentTitle">آخرین نتایج</h3>
         <div id="homeRecent" class="stack"></div>
       </div>
     </section>
@@ -88,6 +93,7 @@
       </div>
       <div id="bracketBody">
         <div id="roundTabs" class="round-tabs" role="tablist" aria-label="مراحل مسابقات"></div>
+        <div id="stageChips" class="chip-row" role="group" aria-label="فیلتر بازی‌های این مرحله"></div>
         <div class="round-hint">
           <p id="roundHintText" class="hint-text">برندهٔ هر بازی به مرحله بعد می‌رود</p>
           <button id="overviewBtn" class="link-btn" onclick="UI.toggleOverview()"><span>◈</span><span id="overviewBtnLabel">کل مسیر</span></button>
@@ -95,9 +101,10 @@
         <div id="roundPanels"></div>
         <div id="bracketToolbar" class="bracket-toolbar hidden">
           <div class="zoom-group">
-            <button class="action small" onclick="UI.zoom(0.1)">＋</button>
-            <button class="action small" onclick="UI.zoom(-0.1)">−</button>
-            <button class="action small" onclick="UI.zoomReset()">↺</button>
+            <button class="action small" onclick="UI.zoom(0.1)" aria-label="بزرگ‌نمایی">＋</button>
+            <button class="action small" onclick="UI.zoom(-0.1)" aria-label="کوچک‌نمایی">−</button>
+            <button class="action small" onclick="UI.zoomReset()" aria-label="بازنشانی زوم">↺</button>
+            <button class="action small" onclick="UI.focusStage()" aria-label="تمرکز روی مرحله فعال">🎯</button>
           </div>
           <div class="toolbar-group">
             <button class="action small" onclick="UI.openDrawDialog()">🎲 قرعه‌کشی مجدد</button>
@@ -127,6 +134,7 @@
         <button class="action primary" onclick="UI.openTeamDialog()">＋ افزودن</button>
       </div>
       <label class="search-wrap"><span class="search-ic" aria-hidden="true">🔍</span><input id="teamSearch" class="field" placeholder="جستجوی تیم..." aria-label="جستجوی تیم" oninput="UI.renderTeams()"></label>
+      <div id="teamSort" class="sort-bar" role="group" aria-label="مرتب‌سازی تیم‌ها"></div>
       <div class="row2">
         <button class="action flex1" onclick="UI.openBulkDialog()">افزودن گروهی</button>
         <button class="action" onclick="Export.pngTeams()">🖼️ عکس</button>
@@ -141,11 +149,8 @@
         <button class="icon-btn" onclick="Export.pngMatches()" aria-label="خروجی عکس مسابقات">🖼️</button>
       </div>
       <input id="matchSearch" class="field" placeholder="جستجوی بازی (نام تیم...)" aria-label="جستجوی بازی" oninput="UI.renderMatches()">
-      <select id="matchFilter" class="field" aria-label="وضعیت بازی" onchange="UI.renderMatches()">
-        <option value="all">همه</option>
-        <option value="scheduled">زمان‌بندی‌شده</option>
-        <option value="done">تمام‌شده</option>
-      </select>
+      <input type="hidden" id="matchFilter" value="all">
+      <div id="matchChips" class="chip-row" role="group" aria-label="فیلتر وضعیت بازی‌ها"></div>
       <div id="matchesList" class="stack"></div>
     </section>
 
@@ -155,11 +160,19 @@
       <div id="statsContent" class="stack"></div>
     </section>
 
+    <!-- آموزش فصل دوم و سوم -->
+    <section id="view-learn" class="view hidden">
+      <p class="section-sub">فصل دوم، سوم و چهارم کتاب • تک‌حذفی / آسیایی / دو‌حذفی</p>
+      <h2 class="section-title">آموزش<span class="dot-accent">.</span></h2>
+      <nav id="learnToc" class="toc" aria-label="فهرست فصل‌ها"></nav>
+      <div id="learnContent" class="stack"></div>
+    </section>
+
     <!-- تنظیمات -->
     <section id="view-settings" class="view hidden">
       <h2 class="section-title">تنظیمات</h2>
       <div class="panel pad">
-        <h3 class="mini-title accent">تورنمنت فعلی</h3>
+        <div class="set-group"><span class="gi" aria-hidden="true">🏆</span><div><h3>تورنمنت فعلی</h3><span class="sub">قواعد و ساختار این جام</span></div></div>
         <label class="row"><span>بازی رده‌بندی (سوم/چهارم)</span><input type="checkbox" id="setThird" onchange="UI.saveTournamentSettings()"></label>
         <label class="row"><span>نوع امتیاز</span>
           <select id="setScoring" onchange="UI.saveTournamentSettings()">
@@ -178,31 +191,52 @@
         </label>
         <label class="row"><span>قرعه استراحت (BYE)</span>
           <select id="setBye" onchange="UI.saveTournamentSettings()">
-            <option value="top">به سیدهای بالا</option>
+            <option value="top">به سیدهای بالا (کتابی)</option>
             <option value="random">تصادفی</option>
           </select>
         </label>
+        <label class="row"><span>نمایش استراحت (فصل دوم)</span>
+          <select id="setByeDisplay" onchange="UI.saveTournamentSettings()">
+            <option value="higher">توان بالاتر — با نوشتن B</option>
+            <option value="lower">توان کمتر/پیشرفته — بدون B</option>
+          </select>
+        </label>
+        <div id="pointsBox" class="hidden">
+          <div class="set-group"><span class="gi" aria-hidden="true">🏅</span><div><h3>امتیاز جدول دوره‌ای</h3><span class="sub">فصل ۵ — امتیاز هر رشته متفاوت است</span></div></div>
+          <label class="row"><span>امتیاز برد</span><input type="number" id="setPtWin" class="field" min="0" max="9" value="3" onchange="UI.saveTournamentSettings()"></label>
+          <label class="row"><span>امتیاز مساوی</span><input type="number" id="setPtDraw" class="field" min="0" max="9" value="1" onchange="UI.saveTournamentSettings()"></label>
+          <label class="row"><span>امتیاز باخت</span><input type="number" id="setPtLoss" class="field" min="0" max="9" value="0" onchange="UI.saveTournamentSettings()"></label>
+        </div>
+        <div class="panel pad calc-box" id="calcBox"></div>
         <div class="grid2">
           <button class="action" onclick="UI.openTournamentDialog(true)">✏️ ویرایش تورنمنت</button>
           <button class="action" onclick="UI.duplicateTournament()">📋 کپی</button>
-          <button class="action danger" onclick="UI.resetBracket()">🗑️ ریست جدول</button>
-          <button class="action danger" onclick="UI.deleteTournament()">❌ حذف تورنمنت</button>
         </div>
       </div>
       <div class="panel pad">
-        <h3 class="mini-title">ظاهر برنامه</h3>
-        <label class="row"><span>تم تیره</span><input type="checkbox" id="setTheme" onchange="UI.saveAppSettings()"></label>
+        <div class="set-group"><span class="gi" aria-hidden="true">🎨</span><div><h3>ظاهر برنامه</h3><span class="sub">تم روشن یا تیره</span></div></div>
+        <div class="theme-picker" role="group" aria-label="انتخاب تم">
+          <button class="theme-opt" data-theme-opt="dark" onclick="UI.setTheme('dark')"><span class="sw2" aria-hidden="true"></span>تیره</button>
+          <button class="theme-opt light" data-theme-opt="light" onclick="UI.setTheme('light')"><span class="sw2" aria-hidden="true"></span>روشن</button>
+        </div>
       </div>
       <div class="panel pad">
-        <h3 class="mini-title">پشتیبان‌گیری</h3>
+        <div class="set-group"><span class="gi" aria-hidden="true">💾</span><div><h3>پشتیبان‌گیری</h3><span class="sub">خروجی و بازیابی اطلاعات</span></div></div>
         <div class="row2">
           <button class="action flex1" onclick="Export.backup()">💾 خروجی بکاپ</button>
           <button class="action flex1" onclick="document.getElementById('restoreFile').click()">📂 بازیابی بکاپ</button>
           <input type="file" id="restoreFile" accept=".json,application/json" class="hidden" onchange="Export.restore(this)">
         </div>
       </div>
+      <div class="panel pad zone-danger">
+        <div class="set-group"><span class="gi" aria-hidden="true">⚠️</span><div><h3>ناحیه خطر</h3><span class="sub">این کارها برگشت‌پذیر نیست</span></div></div>
+        <div class="grid2">
+          <button class="action danger" onclick="UI.resetBracket()">🗑️ ریست جدول</button>
+          <button class="action danger" onclick="UI.deleteTournament()">❌ حذف تورنمنت</button>
+        </div>
+      </div>
       <div class="panel pad about">
-        <h3 class="mini-title">درباره ما</h3>
+        <div class="set-group"><span class="gi" aria-hidden="true">ℹ️</span><div><h3>درباره ما</h3><span class="sub">نسخه ۱ • کاملاً آفلاین</span></div></div>
         <p>🏆 <strong>جدول تک حذفی</strong> — مدیریت حرفه‌ای تورنمنت‌های حذفی، کاملا آفلاین.</p>
         <p>👤 سازنده: <strong>اردلان مظفری</strong> — دانشجو تربیت بدنی</p>
         <p>💬 انتقاد و پیشنهاد:</p>
@@ -221,13 +255,14 @@
   <button data-view="teams" class="nav-item">👥<span>تیم‌ها</span></button>
   <button data-view="matches" class="nav-item">📋<span>بازی‌ها</span></button>
   <button data-view="stats" class="nav-item">📊<span>آمار</span></button>
+  <button data-view="learn" class="nav-item">📖<span>آموزش</span></button>
   <button data-view="settings" class="nav-item">⚙️<span>تنظیمات</span></button>
 </nav>
 
 <aside id="drawer" class="drawer" aria-label="تورنمنت‌ها">
   <div class="drawer-head">
     <strong>تورنمنت‌ها</strong>
-    <button id="drawerClose" class="icon-btn">✕</button>
+    <button id="drawerClose" class="icon-btn" aria-label="بستن فهرست">✕</button>
   </div>
   <div id="tournamentList" class="drawer-list"></div>
   <button id="drawerNew" class="action primary block">＋ تورنمنت جدید</button>

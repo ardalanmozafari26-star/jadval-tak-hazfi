@@ -2,8 +2,13 @@
 const Export = (() => {
   function scoreText(t, m) {
     if (m.status !== 'done' || !m.result) return '—';
-    if (m.result.type === 'bye') return 'استراحت';
-    if (m.result.type !== 'score') return m.result.type === 'walkover' ? 'انصراف' : 'حذف';
+    if (m.result.type === 'bye') return 'استراحت (B)';
+    if (m.result.type !== 'score') {
+      if (m.result.type === 'walkover') return 'انصراف';
+      if (m.result.type === 'dq') return 'حذف انضباطی';
+      if (m.result.type === 'pick') return 'برد';
+      return 'حذف';
+    }
     if ((m.games || []).length && m.seriesWins) {
       const w = m.result.winner === m.a ? m.seriesWins.a + '-' + m.seriesWins.b : m.seriesWins.b + '-' + m.seriesWins.a;
       const det = m.games.filter(g => g.a !== null).map(g => g.a + '-' + g.b).join('، ');
@@ -20,11 +25,25 @@ const Export = (() => {
   function png() {
     const t = Store.active();
     if (!t || !t.rounds.length) { alert('جدولی برای خروجی وجود ندارد.'); return; }
-    const rounds = t.rounds;
+    const dbl = Engine.isDouble(t);
+    const asn = Engine.isAsian(t);
+    const stages = dbl
+      ? t.rounds.map(rd => ({ title: rd.title, matches: rd.matches, kind: 'wb' }))
+        .concat((t.lbRounds || []).filter(rd => rd.matches.some(m => !m.hidden)).map(rd => ({ title: rd.title, matches: rd.matches, kind: 'lb' })))
+        .concat(t.gf ? [{ title: 'فینال بزرگ', matches: [t.gf], kind: 'gf' }] : [])
+      : asn
+        ? t.rounds.map(rd => ({ title: rd.title, matches: rd.matches, kind: 'wb' }))
+          .concat((t.asianRounds || []).filter(rd => rd.matches.some(m => !m.hidden)).map(rd => ({ title: rd.title, matches: rd.matches, kind: rd.kind === 'back' ? 'lb' : 'lb' })))
+        : t.rounds.map(rd => ({ title: rd.title, matches: rd.matches, kind: 'wb' }));
+    const wbCount = t.rounds.length;
+    const rounds = stages;
+    const rr = Engine.isRoundRobin(t);
+    const tbl = rr ? Engine.leagueTable(t) : [];
     const rowH = 64, colW = 250, gap = 46, pad = 40;
     const maxRows = rounds[0].matches.length;
-    const H = pad * 2 + maxRows * (rowH + 14);
-    const W = pad * 2 + rounds.length * (colW + gap) - gap;
+    const tblH = rr ? (70 + tbl.length * 30) : 0;
+    const H = pad * 2 + maxRows * (rowH + 14) + tblH;
+    const W = Math.max(pad * 2 + rounds.length * (colW + gap) - gap, rr ? 760 : 0);
     const cv = document.createElement('canvas');
     const scale = 2;
     cv.width = W * scale; cv.height = H * scale;
@@ -55,7 +74,7 @@ const Export = (() => {
       rd.matches.forEach((m, i) => {
         const y = yOf(r, i) + 18;
         // خط اتصال به بازی بعد
-        if (r < rounds.length - 1) {
+        if (rd.kind === 'wb' && r < wbCount - 1) {
           const nx = pad + (r + 1) * (colW + gap);
           const ny = yOf(r + 1, Math.floor(i / 2)) + 18 + rowH / 2;
           c.strokeStyle = '#94a3b8'; c.lineWidth = 2;
@@ -79,6 +98,35 @@ const Export = (() => {
         drawSide(c, t, m.b, ds.b, x, y + rowH / 2, colW, w === m.b && m.b && m.b !== 'BYE', true);
       });
     });
+
+    /* جدول ثبت نتایج گروه (جدول دوره‌ای) */
+    if (rr && tbl.length) {
+      const ty = H - tblH + 34;
+      c.textAlign = 'right';
+      c.fillStyle = dark ? '#c4f35b' : '#65a30d';
+      c.font = 'bold 17px Tahoma';
+      c.fillText('جدول ثبت نتایج گروه', W - pad, ty);
+      const cols = [
+        ['رتبه', 44], ['تیم', 210], ['بازی', 58], ['برد', 52], ['باخت', 56], ['مساوی', 62],
+        ['زده', 52], ['خورده', 62], ['تفاضل', 62], ['امتیاز', 68]
+      ];
+      let x = W - pad;
+      c.font = 'bold 13px Tahoma';
+      c.fillStyle = dark ? '#a3adba' : '#64748b';
+      cols.forEach(cl => { c.fillText(cl[0], x - cl[1], ty + 24); x -= cl[1]; });
+      c.strokeStyle = dark ? '#33415580' : '#cbd5e1';
+      c.lineWidth = 1;
+      c.beginPath(); c.moveTo(W - pad, ty + 32); c.lineTo(pad, ty + 32); c.stroke();
+      tbl.forEach((r, i) => {
+        const y = ty + 32 + (i + 1) * 30;
+        c.textAlign = 'right';
+        c.fillStyle = dark ? '#f1f4f7' : '#0e1116';
+        c.font = (i === 0 ? 'bold ' : '') + '13px Tahoma';
+        const vals = [String(r.rank), r.name, String(r.played), String(r.won), String(r.lost), String(r.drawn), String(r.gf), String(r.ga), String(r.gd), String(r.pts)];
+        let xx = W - pad;
+        cols.forEach((cl, k) => { c.fillText(cut(vals[k], 20), xx - cl[1], y); xx -= cl[1]; });
+      });
+    }
 
     shareOrDownload(cv.toDataURL('image/png'), t.name + '-bracket.png');
   }
@@ -141,7 +189,8 @@ const Export = (() => {
     c.fillStyle = P.muted; c.font = '16px Tahoma';
     c.fillText(cut(sub, 60), W - pad, 94);
     c.fillStyle = P.gold; c.font = 'bold 20px Tahoma'; c.textAlign = 'left';
-    c.fillText('🏆 جدول تک حذفی', pad, 62);
+    const at = Store.active();
+    c.fillText(at && Engine.isDouble(at) ? '🏆 جدول دو حذفی' : at && Engine.isAsian(at) ? '🏆 جدول آسیایی' : at && Engine.isRoundRobin(at) ? '🏆 جدول دوره‌ای' : '🏆 جدول تک حذفی', pad, 62);
     let y = 130;
     sections.forEach(s => {
       c.textAlign = 'right'; c.fillStyle = P.accent; c.font = 'bold 20px Tahoma';
@@ -281,7 +330,7 @@ const Export = (() => {
     const t = needT(); if (!t || !t.rounds.length) { alert('بازی‌ای نیست.'); return; }
     const secs = [];
     let lastRt = '', cur = null;
-    Engine.allMatches(t).forEach(x => {
+    Engine.allMatches(t).filter(x => !x.m.hidden).forEach(x => {
       if (x.roundTitle !== lastRt) { cur = { head: x.roundTitle, rows: [] }; secs.push(cur); lastRt = x.roundTitle; }
       const m = x.m;
       cur.rows.push({
@@ -332,13 +381,34 @@ const Export = (() => {
     input.value = '';
   }
 
-  /* خروجی CSV بازی‌ها و تیم‌ها */
+  /* خروجی CSV بازی‌ها و تیم‌ها (با محاسبات فصل دوم + رپشاژ) */
   function csv() {
     const t = Store.active();
     if (!t) { alert('تورنمنتی نیست.'); return; }
     const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-    const lines = ['\ufeffمرحله,شماره بازی,تیم اول,تیم دوم,نتیجه,تاریخ,ساعت,محل,داور,بهترین بازیکن'];
-    Engine.allMatches(t).forEach((x, i) => {
+    const dbl = Engine.isDouble(t);
+    const asn = Engine.isAsian(t);
+    const rr = Engine.isRoundRobin(t);
+    const lines = ['\ufeff' + (dbl ? 'جدول دو حذفی (فصل چهارم)' : asn ? 'جدول آسیایی (فصل سوم)' : rr ? 'جدول دوره‌ای (فصل پنجم)' : 'جدول تک‌حذفی (فصل دوم)') + ',"' + (t.name || '') + '"'];
+    try {
+      const mFa = (t.drawMethod === 'seeding' ? 'سیدگذاری' : t.drawMethod === 'combined' ? 'ترکیبی' : t.drawMethod === 'manual' ? 'دستی' : 'قرعه‌کشی');
+      if (dbl) {
+        const d = Engine.deCalcInfo(t.teams.length);
+        lines.push('روش چیدمان,' + q(mFa) + ',مبنا,' + d.base + ',استراحت,' + d.byes + ',برنده‌ها,' + d.wbMatches + ',بازنده‌ها,' + d.lbMatches + ',فینال,' + d.gfMatches + ',کل مسابقات,' + d.total);
+      } else if (asn) {
+        const a = Engine.asianCalcInfo(t.teams.length);
+        lines.push('روش چیدمان,' + q(mFa) + ',مبنا,' + a.base + ',استراحت,' + a.byes + ',دور اول,' + a.firstMatches + ',جدول جلو,' + a.front + ',پشت جدول,' + a.back + ',کل بازی‌ها,' + a.total);
+      } else if (rr) {
+        const r = Engine.roundCalcInfo(t.teams.length);
+        const P = (t.settings && t.settings.points) || { win: 3, draw: 1, loss: 0 };
+        lines.push('روش چیدمان,' + q(mFa) + ',تعداد دور,' + r.rounds + ',مسابقه در هر دور,' + r.perRound + ',مسابقات هر تیم,' + r.perTeam + ',کل مسابقات,' + r.total + ',امتیاز برد,' + (P.win || 0) + ',امتیاز مساوی,' + (P.draw || 0) + ',امتیاز باخت,' + (P.loss || 0));
+      } else {
+        const c = Engine.calcInfo(t.teams.length);
+        lines.push('روش چیدمان,' + q(mFa) + ',مبنا,' + c.base + ',دور,' + c.rounds + ',کل مسابقات,' + c.total + ',استراحت,' + c.byes + ',دور اول,' + c.firstMatches + ',جمع جفت‌سید,' + c.sum);
+      }
+    } catch (e) {}
+    lines.push('مرحله,شماره بازی,تیم اول,تیم دوم,نتیجه,تاریخ,ساعت,محل,داور,بهترین بازیکن');
+    Engine.allMatches(t).filter(x => !x.m.hidden).forEach((x, i) => {
       const m = x.m;
       lines.push([x.roundTitle, i + 1, Engine.teamName(t, m.a), Engine.teamName(t, m.b),
         scoreText(t, m), m.date, m.time, m.place, m.ref, Engine.mvpName(m)].map(q).join(','));
@@ -349,11 +419,26 @@ const Export = (() => {
       const r = Engine.record(t, tm.id);
       lines.push([tm.name, tm.coach, tm.rank, r.played, r.won, r.lost, r.gf, r.ga, r.y, r.r].map(q).join(','));
     });
+    if (rr) {
+      lines.push('');
+      lines.push('جدول ثبت نتایج گروه');
+      lines.push(['رتبه', 'تیم', 'بازی', 'برد', 'باخت', 'مساوی', 'زده', 'خورده', 'تفاضل', 'امتیاز'].map(q).join(','));
+      Engine.leagueTable(t).forEach(r => {
+        lines.push([r.rank, r.name, r.played, r.won, r.lost, r.drawn, r.gf, r.ga, r.gd, r.pts].map(q).join(','));
+      });
+    }
     lines.push('');
     lines.push('بازیکن,تیم,گل,پاس گل,بازی');
     Engine.scorersTable(t).forEach(p => {
       lines.push([p.name, Engine.teamName(t, p.team), p.goals, p.assists, p.played].map(q).join(','));
     });
+    if (t.repechage) {
+      lines.push('');
+      lines.push('شانس مجدد (رپشاژ),سوم مشترک,' + q((t.repechage.third || []).map(id => Engine.teamName(t, id)).join(' و ')));
+      lines.push('دسته,بازیکن/تیم');
+      (t.repechage.champLosers || []).forEach(id => lines.push(['بازنده به قهرمان', Engine.teamName(t, id)].map(q).join(',')));
+      (t.repechage.runnerLosers || []).forEach(id => lines.push(['بازنده به نایب‌قهرمان', Engine.teamName(t, id)].map(q).join(',')));
+    }
     shareTextFile(lines.join('\n'), t.name + '.csv', 'text/csv;charset=utf-8');
   }
 

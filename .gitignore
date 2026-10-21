@@ -11,3 +11,4 @@ preview/
 myket-shots/
 *.log
 release-apk/
+.playwright-mcp/

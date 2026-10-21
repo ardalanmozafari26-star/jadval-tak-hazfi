@@ -14,6 +14,7 @@
       if (e.target.id === 'modalOverlay') UI.closeModal();
     });
     UI.initGestures();
+    UI.initShell();
     UI.render();
     UI.updateFab();
     requestAnimationFrame(() => UI.moveTabInd());

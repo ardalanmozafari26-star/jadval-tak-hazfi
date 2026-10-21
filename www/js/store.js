@@ -37,6 +37,7 @@ const Store = (() => {
       id: uid(),
       name: (data.name || 'تورنمنت جدید').trim(),
       sport,
+      format: ['single', 'double', 'asian', 'round'].includes(data.format) ? data.format : 'single',
       targetSize: parseInt(data.targetSize || '8', 10),
       startDate: data.startDate || '', endDate: data.endDate || '',
       place: data.place || '', desc: data.desc || '',
@@ -46,7 +47,10 @@ const Store = (() => {
         thirdPlace: data.thirdPlace !== false,
         scoring: data.scoring || SCORING_BY_SPORT[sport] || 'goals',
         series: parseInt(data.series || '1', 10) || 1,
-        byeTo: data.byeTo || 'top'
+        byeTo: data.byeTo || 'top',
+        byeDisplay: data.byeDisplay || 'higher',
+        repechage: !!data.repechage,
+        points: Object.assign({ win: 3, draw: 1, loss: 0 }, data.points || {})
       },
       teams: [], rounds: [], thirdPlace: null, champion: null,
       createdAt: Date.now(), updatedAt: Date.now()
@@ -126,6 +130,8 @@ const Store = (() => {
     if (t.rounds && t.rounds.length) {
       if (!confirm('جدول قرعه‌کشی شده است. با حذف تیم، جدول ریست می‌شود. ادامه؟')) return;
       t.rounds = []; t.thirdPlace = null; t.champion = null; t.status = 'setup';
+      t.lbRounds = []; t.gf = null; t.losses = null; t.eliminated = null;
+      t.asianRounds = []; t.asianTree = null;
     }
     t.teams = t.teams.filter(x => x.id !== teamId);
     t.updatedAt = Date.now();
