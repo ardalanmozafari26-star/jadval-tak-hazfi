@@ -698,6 +698,24 @@ table.league-table td:last-child{color:var(--primary);}
 .podium-item .pos{font-size:var(--fs-2xs); color:var(--muted);}
 .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:var(--sp-2); margin-bottom:var(--sp-3);}
 .stat-grid .stat-card{padding:var(--sp-3) 4px;}
+/* آمار اختصاصی تک‌حذفی/آسیایی/دوحذفی/دوره‌ای */
+.single-grid,.asian-grid,.double-grid,.round-grid{grid-template-columns:repeat(3,1fr);}
+.round-grid .stat-card:nth-child(-n+2){border-color:var(--primary-line);}
+.league-table .leader-row{background:linear-gradient(160deg,var(--primary-soft),transparent);}
+.form-pills{display:inline-flex; gap:3px;}
+.form-pill.d{background:var(--muted);}
+.double-grid .stat-card:nth-child(-n+3){border-color:var(--primary-line);}
+.loss-pill{display:inline-flex; align-items:center; gap:4px; padding:1px 8px; border-radius:var(--r-full); font-size:var(--fs-xs); font-weight:var(--fw-medium); border:1px solid var(--border); background:var(--surface-2); color:var(--muted); white-space:nowrap;}
+.loss-pill.ok{color:var(--success); border-color:var(--success);}
+.loss-pill.warn{color:var(--warning, #b7791f); border-color:var(--warning, #b7791f);}
+.loss-pill.out{color:var(--danger); border-color:var(--danger-line);}
+.de-board th:nth-child(n+2),.de-board td:nth-child(n+2){min-width:56px;}
+.chip.static{cursor:default;}
+.chip.static .n{background:var(--surface-2); border-radius:var(--r-full); padding:1px 7px;}
+table.stats td.hot{font-weight:var(--fw-black); color:var(--primary);}
+.mini-title .count{font-size:var(--fs-2xs); color:var(--muted); font-weight:var(--fw-medium); background:var(--surface-2); border-radius:var(--r-full); padding:1px 8px;}
+.view-top .chip.static{flex-shrink:0;}
+@media (max-width:380px){.single-grid,.asian-grid,.double-grid,.round-grid{grid-template-columns:repeat(2,1fr);}}
 
 /* آموزش: آکاردئون و فهرست */
 .toc{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:var(--sp-3);}

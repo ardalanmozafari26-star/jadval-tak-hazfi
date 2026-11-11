@@ -36,6 +36,5 @@
     </application>
 
     <!-- Permissions -->
-
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- آفلاین: بدون نیاز به اینترنت -->
 </manifest>

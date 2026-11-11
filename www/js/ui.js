@@ -39,7 +39,7 @@ const UI = (() => {
       ((dbl || asn) ? '' : '<button class="action" onclick="UI.closeModal();UI.openSwapDialog()">🔀 جابه‌جایی سید نزدیک</button>') +
       ((dbl || asn || rr) ? '' : '<button class="action" onclick="UI.closeModal();UI.buildRepechage()">🥉 رپشاژ (شانس مجدد)</button>') +
       '<button class="action" onclick="UI.closeModal();UI.switchView(\'learn\')">📖 آموزش فصل دوم تا پنجم</button>' +
-      '<button class="action" onclick="UI.closeModal();Export.png()">🖼️ عکس PNG</button>' +
+      '<button class="action" onclick="UI.closeModal();Export.png()">🖼️ عکس مربعی</button>' +
       '<button class="action" onclick="UI.closeModal();Export.print()">🖨️ چاپ / PDF</button></div>' +
       '<div class="modal-btns"><button class="action" onclick="UI.closeModal();Export.csv()">📊 خروجی CSV (با محاسبات و رپشاژ)</button></div>');
   }
@@ -146,7 +146,7 @@ const UI = (() => {
     if (!btn) return;
     let b = btn.querySelector('.nav-badge');
     if (!b) { b = document.createElement('span'); b.className = 'nav-badge'; btn.appendChild(b); }
-    const n = t ? Engine.allMatches(t).filter(x => !x.m.hidden && x.m.status !== 'done' && x.m.a && x.m.b && x.m.a !== 'BYE' && x.m.b !== 'BYE').length : 0;
+    const n = t ? Engine.visibleMatches(t).filter(x => x.m.status !== 'done' && x.m.a && x.m.b && x.m.a !== 'BYE' && x.m.b !== 'BYE').length : 0;
     b.textContent = Engine.faNum(n);
     b.classList.toggle('show', n > 0);
   }
@@ -227,7 +227,7 @@ const UI = (() => {
     $('homeEmpty').classList.toggle('hidden', !!t);
     $('homeContent').classList.toggle('hidden', !t);
     if (!t) return;
-    const all = Engine.allMatches(t).filter(x => !x.m.hidden);
+    const all = Engine.visibleMatches(t);
     const done = all.filter(x => x.m.status === 'done').length;
     const pct = all.length ? Math.round(done / all.length * 100) : 0;
     $('homeStats').innerHTML =
@@ -235,6 +235,9 @@ const UI = (() => {
       statCard(done, 'انجام‌شده', done, '✅') + statCard(pct + '٪', 'پیشرفت', null, '📈');
     countUp();
     const next = all.find(x => x.m.status !== 'done' && x.m.a && x.m.b && x.m.a !== 'BYE' && x.m.b !== 'BYE');
+    // شماره محلی مرحله: «بازی سراسری X • بازی مرحله Y»
+    const stageNums = {};
+    { const byRt = {}; all.forEach(x => { byRt[x.roundTitle] = (byRt[x.roundTitle] || 0) + 1; x._stageNum = byRt[x.roundTitle]; }); }
     const R = 30, C = 2 * Math.PI * R;
     const dash = document.createElement('div');
     dash.className = 'dash';
@@ -242,7 +245,7 @@ const UI = (() => {
       '<div class="dash-card"><svg class="ring" viewBox="0 0 74 74"><circle cx="37" cy="37" r="' + R + '" fill="none" stroke="rgba(0,0,0,.22)" stroke-width="8"/>' +
       '<circle cx="37" cy="37" r="' + R + '" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-dasharray="' + (C * pct / 100) + ' ' + C + '" transform="rotate(-90 37 37)"/>' +
       '<text x="37" y="43" text-anchor="middle" class="pct">' + pct + '٪</text></svg><div class="sub">پیشرفت تورنمنت</div></div>' +
-      '<div class="dash-card gold"><div class="sub">' + (next ? esc(next.roundTitle) + ' • بازی ' + Engine.faNum(Engine.matchNumber(t, next.m.id)) : 'بازی بعدی') + '</div>' +
+      '<div class="dash-card gold"><div class="sub">' + (next ? esc(next.roundTitle) + ' • بازی سراسری ' + Engine.faNum(Engine.matchNumber(t, next.m.id)) + ' • بازی مرحله ' + Engine.faNum(next._stageNum || 1) : 'بازی بعدی') + '</div>' +
       '<div class="big">' + (next ? esc(Engine.teamName(t, next.m.a)) + ' ⚔️ ' + esc(Engine.teamName(t, next.m.b)) : '—') + '</div>' +
       '<div class="sub">' + (next ? countdownText(next.m) : 'همه بازی‌ها تمام شده 🎉') + '</div>' +
       (next ? '<div class="sub">' + esc([next.m.place, next.m.ref ? 'داور: ' + next.m.ref : ''].filter(Boolean).join(' • ') || 'مکان و داور ثبت نشده') + '</div>' +
@@ -267,7 +270,7 @@ const UI = (() => {
           : '<button class="quick-btn" onclick="UI.switchView(\'matches\')"><span class="qi" aria-hidden="true">📋</span>بازی‌ها</button>') +
         '<button class="quick-btn" onclick="UI.openDrawDialog()"><span class="qi" aria-hidden="true">🎲</span>قرعه‌کشی</button>' +
         '<button class="quick-btn" onclick="UI.openTeamDialog()"><span class="qi" aria-hidden="true">👥</span>افزودن تیم</button>' +
-        '<button class="quick-btn" onclick="Export.png()"><span class="qi" aria-hidden="true">🖼️</span>خروجی عکس</button>';
+        '<button class="quick-btn" onclick="Export.pngHome()"><span class="qi" aria-hidden="true">🖼️</span>پوستر جام</button>';
     }
     // شمارنده بخش‌ها
     setCount('homeTodayTitle', todays.length);
@@ -404,13 +407,14 @@ const UI = (() => {
     if (m.b === 'BYE') bN = 'B (استراحت)';
     const w = m.status === 'done' && m.result ? m.result.winner : null;
     const num = Engine.matchNumber(t, m.id);
+    const stageTag = m._stageNum ? ' • بازی مرحله ' + Engine.faNum(m._stageNum) : '';
     const tmA = m.a && m.a !== 'BYE' ? teamById(t, m.a) : null;
     const tmB = m.b && m.b !== 'BYE' ? teamById(t, m.b) : null;
     const meta = metaLine(t, m);
     const sched = m.status !== 'done';
     return '<div class="match-row match' + (m.status === 'done' ? ' done' : '') + '" onclick="UI.openMatchDialog(\'' + m.id + '\')">' +
       '<div class="sc-top">' + statusTag(m) +
-      '<span class="sc-num">' + (num ? 'بازی ' + Engine.faNum(num) + ' • ' : '') + esc(rt || '') + '</span></div>' +
+      '<span class="sc-num">' + (num ? 'بازی سراسری ' + Engine.faNum(num) + stageTag + ' • ' : '') + esc(rt || '') + '</span></div>' +
       '<div class="match-teams">' +
       '<div class="team-line' + (w === m.a ? ' winner' : '') + '">' + crest(tmA) + '<span class="tname">' + esc(aN) + '</span><span class="score-box">' + sideScore(t, m, 'a') + '</span></div>' +
       '<div class="team-line' + (w === m.b ? ' winner' : '') + '">' + crest(tmB) + '<span class="tname">' + esc(bN) + '</span><span class="score-box">' + sideScore(t, m, 'b') + '</span></div>' +
@@ -423,7 +427,7 @@ const UI = (() => {
   }
   function isNext(t, m) {
     if (!m || m.status === 'done') return false;
-    const all = Engine.allMatches(t).filter(x => !x.m.hidden);
+    const all = Engine.visibleMatches(t);
     const nx = all.find(x => x.m.status !== 'done' && x.m.a && x.m.b && x.m.a !== 'BYE' && x.m.b !== 'BYE');
     return nx && nx.m.id === m.id;
   }
@@ -508,7 +512,7 @@ const UI = (() => {
       '<span>تعداد دور: ' + Engine.faNum(c.rounds) + '</span>' +
       '<span>کل مسابقات: ' + Engine.faNum(c.total) + ' (n−۱)</span>' +
       '<span>استراحت (B): ' + Engine.faNum(c.byes) + ' (' + Engine.faNum(c.base) + '−' + Engine.faNum(c.n) + ')</span>' +
-      '<span>مسابقات دور اول: ' + Engine.faNum(c.firstMatches) + '</span>' +
+      '<span>دور اول روی کاغذ: ' + Engine.faNum(c.drawnMatches) + ' بازی (واقعی ' + Engine.faNum(c.realFirst) + ' + استراحت ' + Engine.faNum(c.byes) + ')</span>' +
       '<span>جمع جفت‌سید: ' + Engine.faNum(c.sum) + '</span>' +
       '</div>' +
       '<div class="calc-note">نمایش استراحت: ' + esc(byeDisp) + (c.byes ? ' • استراحت‌ها به سیدهای بالا رسید' : ' • بدون استراحت') + '</div></div>';
@@ -546,7 +550,7 @@ const UI = (() => {
       '<span>جدول جلو (مقام ۱ تا ' + Engine.faNum(c.front) + '): ' + Engine.faNum(c.front) + ' تیم</span>' +
       '<span>پشت جدول (مقام ' + Engine.faNum(c.front + 1) + ' تا ' + Engine.faNum(c.base) + '): ' + Engine.faNum(c.back) + ' تیم</span>' +
       '<span>کل بازی‌ها (رتبه‌بندی کامل): ' + Engine.faNum(c.total) + '</span>' +
-      '<span>بازی‌های واقعی (بدون استراحت): ' + Engine.faNum(c.played) + '</span>' +
+      '<span>بازی‌های واقعی (بدون استراحت): ' + Engine.faNum(Engine.statsOverview(t).total) + '</span>' +
       '</div>' +
       '<div class="calc-note">بازندگان از دور خارج نمی‌شوند؛ هر بازنده فقط برای بهترین مقام همان دور رقابت می‌کند (فصل ۳).</div>' +
       '<div class="calc-note">نمایش استراحت: ' + esc(byeDisp) + (c.byes ? ' • ' + Engine.faNum(c.byes) + ' استراحت (B)' : ' • بدون استراحت') + '</div></div>';
@@ -716,8 +720,8 @@ const UI = (() => {
     if (bracketMode === 'list') {
       if (chips) chips.classList.add('hidden');
       rp.classList.add('hidden'); sc.classList.add('hidden'); bl.classList.remove('hidden'); tb.classList.remove('hidden');
-      let lastRt = '';
-      bl.innerHTML = calcPanelHtml(t) + repechageBoxHtml(t) + Engine.allMatches(t).filter(x => !x.m.hidden).map(x => {
+    let lastRt = '';
+    bl.innerHTML = calcPanelHtml(t) + repechageBoxHtml(t) + Engine.visibleMatches(t).map(x => {
         const h = x.roundTitle !== lastRt ? '<h3 class="block-title">' + esc(x.roundTitle) + '</h3>' : '';
         lastRt = x.roundTitle;
         return h + matchRow(t, x.m, x.roundTitle);
@@ -756,6 +760,7 @@ const UI = (() => {
     const emptyFilter = !showMatches.length && rd.matches.length ? '<p class="placeholder">با این فیلتر بازی‌ای در این مرحله نیست 🔍</p>' : '';
     const byeNote = ((t.settings.byeDisplay || 'higher') === 'lower' && currentRound === 0 && !Engine.isDouble(t) && showMatches.length !== rd.matches.length)
       ? '<p class="note-xs">روش توان کمتر: ' + Engine.faNum(rd.matches.length - showMatches.length) + ' بازی استراحت (B) نمایش داده نشد؛ برندگان استراحت مستقیم در دور بعد‌اند.</p>' : '';
+    showMatches.forEach((m, i) => { m._stageNum = i + 1; });
     let html = calcPanelHtml(t) + repechageBoxHtml(t) + byeNote + emptyFilter + '<div class="match-cards">' + showMatches.map(m => matchRow(t, m, stg.perMatch ? (m.title || rd.title) : rd.title)).join('') + '</div>';
     const lastWb = Engine.isAsian(t)
       ? stages.reduce((acc, s, i) => (s.kind === 'wb' ? i : acc), -1)
@@ -787,6 +792,7 @@ const UI = (() => {
       if (stg.kind === 'table') return '';
       const tot = stg.matches.length, dn = stg.matches.filter(m => m.status === 'done').length;
       const badge = '<span class="badge' + (tot && dn === tot ? ' full' : '') + '">' + Engine.faNum(dn) + '/' + Engine.faNum(tot) + '</span>';
+      stg.matches.forEach((m, i) => { m._stageNum = i + 1; });
       return '<div class="round' + (stg.kind === 'lb' || stg.kind === 'place' ? ' lb-round' : '') + (stg.kind === 'gf' ? ' gf-round' : '') + '" data-stage="' + r + '">' +
         '<div class="round-title">' + esc(stg.title) + badge + '</div><div class="round-matches">' +
         stg.matches.map(m => bmatch(t, m)).join('') + '</div></div>';
@@ -886,7 +892,7 @@ const UI = (() => {
     else mid = '<div class="bm-vs">' + esc(Export.scoreText(t, m)) + '</div>';
     return '<div class="bmatch' + (m.status === 'done' ? ' done' : '') + '" onclick="UI.openMatchDialog(\'' + m.id + '\')">' +
       side(m.a, fmt(ds.a)) + mid + side(m.b, fmt(ds.b)) +
-      '<div class="bm-info">بازی ' + Engine.faNum(Engine.matchNumber(t, m.id)) + ' • ' + esc(metaLine(t, m)) + (m.locked ? ' 🔒' : '') + '</div></div>';
+      '<div class="bm-info">بازی سراسری ' + Engine.faNum(Engine.matchNumber(t, m.id)) + (m._stageNum ? ' • بازی مرحله ' + Engine.faNum(m._stageNum) : '') + ' • ' + esc(metaLine(t, m)) + (m.locked ? ' 🔒' : '') + '</div></div>';
   }
 
   function emptyState(icon, title, sub, btn, act) {
@@ -965,15 +971,8 @@ const UI = (() => {
     const f = $('matchFilter').value;
     const q2 = (($('matchSearch') && $('matchSearch').value) || '').trim();
     let lastRt = '';
-    const list = Engine.allMatches(t).filter(x => !x.m.hidden);
-    // بازی‌های شانس مجدد (رپشاژ) هم در فهرست بازی‌ها می‌آیند
-    if (t.repechage) {
-      ['champ', 'runner'].forEach(g => {
-        const br = t.repechage[g === 'champ' ? 'champBracket' : 'runnerBracket'];
-        if (br && br.rounds) br.rounds.forEach(rd => rd.matches.forEach(m => list.push({ roundTitle: 'رپشاژ', m })));
-      });
-      if (t.repechage.playoff) list.push({ roundTitle: 'پل‌آف سوم', m: t.repechage.playoff });
-    }
+    // allMatches رپشاژ را هم دارد؛ visibleMatches فیلتر byeDisplay را هم اعمال می‌کند
+    const list = Engine.visibleMatches(t);
     // چیپ‌های فیلتر با شمار
     const chips = $('matchChips');
     const today = Engine.todayISO();
@@ -1003,7 +1002,268 @@ const UI = (() => {
     renderMatches();
   }
 
-  /* ---------- آمار ---------- */
+  /* ---------- آمار (جدا برای تک‌حذفی و آسیایی) ---------- */
+  function statsContext(t) {
+    const rows = t.teams.map(tm => Object.assign({ tm }, Engine.record(t, tm.id)))
+      .sort((a, b) => b.won - a.won || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+    const rank = Engine.finalRank(t);
+    const fair = [...rows].sort((a, b) => a.fair - b.fair || a.y - b.y);
+    const mvpBoard = Engine.tournamentMvp(t);
+    const mvpMeta = (typeof SPORTS_META !== 'undefined' && (SPORTS_META[t.sport] || SPORTS_META.custom));
+    const primaryLbl = ((mvpMeta.mvpStats.find(s => s.key === mvpMeta.primary)) || {}).label || '';
+    const ov = Engine.statsOverview(t);
+    return { rows, rank, fair, mvpBoard, primaryLbl, ov };
+  }
+  function mvpHtmlOf(t, ctx, bare) {
+    if (!ctx.mvpBoard.length) return '';
+    return (bare ? '' : '<h3 class="block-title">ستارگان میدان ⭐</h3>') +
+      (ctx.mvpBoard[0].awards ? '<div class="champ"><div class="t">⭐ بهترین بازیکن تورنمنت</div><div class="n">' + esc(ctx.mvpBoard[0].name) + '</div><div class="t">' + Engine.faNum(ctx.mvpBoard[0].awards) + ' بار بهترین بازیکن' + (ctx.primaryLbl ? ' • ' + Engine.faNum(ctx.mvpBoard[0].main) + ' ' + ctx.primaryLbl : '') + '</div></div>' : '') +
+      '<table class="stats"><tr><th>بازیکن</th><th>تیم</th><th>بهترین بازیکن</th>' + (ctx.primaryLbl ? '<th>' + ctx.primaryLbl + '</th>' : '') + '</tr>' +
+      ctx.mvpBoard.map(p => '<tr><td>⭐ ' + esc(p.name) + '</td><td>' + esc(Engine.teamName(t, p.team)) + '</td><td>' + Engine.faNum(p.awards) + '</td>' + (ctx.primaryLbl ? '<td>' + Engine.faNum(p.main) + '</td>' : '') + '</tr>').join('') + '</table>';
+  }
+  function podiumHtmlOf(t, rank) {
+    if (rank.length < 3) return '';
+    return '<h3 class="block-title">سکوی قهرمانان</h3><div class="podium">' +
+      [rank[1], rank[0], rank[2]].map(r => {
+        const first = r === rank[0];
+        const pos = rank.indexOf(r) + 1;
+        return '<div class="podium-item' + (first ? ' first' : '') + '"><div class="medal" aria-hidden="true">' + MEDALS[pos - 1] + '</div>' +
+          '<div class="nm">' + esc(Engine.teamName(t, r.id)) + '</div><div class="sub">' + esc(r.title) + '</div></div>';
+      }).join('') + '</div>';
+  }
+  function fairHtmlOf(ctx) {
+    return '<h3 class="block-title">بازی جوانمردانه</h3><table class="stats"><tr><th>تیم</th><th>🟨</th><th>🟥</th><th>امتیاز منفی</th></tr>' +
+      ctx.fair.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.y) + '</td><td>' + Engine.faNum(r.r) +
+        '</td><td>' + Engine.faNum(r.fair) + '</td></tr>').join('') + '</table>';
+  }
+  function perfTableHtml(ctx, highlightPlayed, bare) {
+    return (bare ? '' : '<h3 class="block-title">جدول عملکرد تیم‌ها</h3>') + '<table class="stats"><tr><th>تیم</th><th>بازی</th><th>برد</th><th>باخت</th><th>زده</th><th>خورده</th><th>تفاضل</th></tr>' +
+      ctx.rows.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td' + (highlightPlayed ? ' class="hot"' : '') + '>' + Engine.faNum(r.played) + '</td><td>' + Engine.faNum(r.won) +
+        '</td><td>' + Engine.faNum(r.lost) + '</td><td>' + Engine.faNum(r.gf) + '</td><td>' + Engine.faNum(r.ga) +
+        '</td><td>' + Engine.faNum(r.gf - r.ga) + '</td></tr>').join('') + '</table>';
+  }
+  function champBlockHtml(t, champ) {
+    if (champ) {
+      return '<div class="panel pad stats-champ"><div class="champion-emblem">🏆</div><div class="champ-label">🏆 قهرمان تورنمنت</div><div class="champ-name">' + esc(champ.name) + '</div></div>' + champPathHtml(t);
+    }
+    const left = Engine.visibleMatches(t).filter(x => x.m.status !== 'done' && x.m.a !== 'BYE' && x.m.b !== 'BYE').length;
+    return '<div class="panel pad stats-champ"><div class="champion-emblem">🏆</div><h3>قهرمان هنوز مشخص نشده</h3><p>' + Engine.faNum(left) + ' بازی تا پایان باقی مانده است.</p></div>';
+  }
+  /* خلاصه تک‌حذفی: انجام‌شده/باقی‌مانده + استراحت کتابی (B) */
+  function statsDl(key) {
+    const map = { summary: 'Export.pngStatsSummary()', rank: 'Export.pngStatsRank()', perf: 'Export.pngStatsPerf()', scorers: 'Export.pngStatsScorers()', special: 'Export.pngStatsSpecial()' };
+    return '<button class="action small" onclick="' + (map[key] || map.summary) + '" aria-label="خروجی مربعی این بخش">🖼️</button>';
+  }
+  function statsBlockHead(title, key) {
+    return '<div class="view-top"><h3 class="block-title m-0">' + title + '</h3>' + statsDl(key) + '</div>';
+  }
+  function singleSummaryHtml(ctx) {
+    const avg = ctx.ov.done ? String((ctx.ov.avg || 0).toFixed(1)).replace(/[0-9.]+/g, d => Engine.faNum(d)) : '—';
+    const topWin = ctx.rows.reduce((mx, r) => Math.max(mx, r.won || 0), 0);
+    return '<div class="stat-grid single-grid">' +
+      statCard(ctx.ov.done + ' / ' + ctx.ov.total, 'بازی انجام‌شده', ctx.ov.done, '⚽') +
+      statCard(ctx.ov.left, 'بازی باقی‌مانده', ctx.ov.left, '⏳') +
+      statCard(ctx.ov.goals, 'گل', ctx.ov.goals, '🥅') +
+      statCard(avg, 'میانگین گل', null, '📊') +
+      statCard(ctx.ov.byes, 'استراحت (B)', ctx.ov.byes, '💤') +
+      statCard(topWin, 'بیشترین برد', topWin, '🏅') + '</div>';
+  }
+  /* باکت حذف‌شدگان به تفکیک دور (بدون BYE و مخفی) */
+  function exitBucketsHtml(t) {
+    const buckets = Engine.exitBuckets(t);
+    if (!buckets.length) return '<p class="panel pad note-panel">هنوز حذفی ثبت نشده است.</p>';
+    return buckets.map(b => {
+      const title = (b.round === (t.rounds.length - 1)) ? 'بازنده فینال 🥈'
+        : (b.round === (t.rounds.length - 2) && t.rounds.length >= 2) ? 'حذف در نیمه‌نهایی 🥉'
+        : ('حذف در ' + esc(b.title) + ' — ' + esc(Engine.sharedRankTitle ? Engine.sharedRankTitle(b.parts) : ''));
+      return '<h4 class="mini-title">' + title + ' <span class="count">' + Engine.faNum(b.ids.length) + ' تیم</span></h4>' +
+        '<div class="chip-row">' + b.ids.map(id => {
+          const tm = teamById(t, id);
+          const sd = Engine.seedRankOf(t, id);
+          return '<span class="chip static">' + avatar(tm) + esc(Engine.teamName(t, id)) + (sd ? ' <span class="n">سید ' + Engine.faNum(sd) + '</span>' : '') + '</span>';
+        }).join('') + '</div>';
+    }).join('');
+  }
+  /* شگفتی‌های جام: برد سید ضعیف‌تر */
+  function upsetsHtml(t) {
+    const ups = Engine.cupUpsets(t);
+    if (!ups.length) return '<p class="panel pad note-panel">شگفتی‌ای ثبت نشده؛ یعنی سیدهای بالا همه برده‌اند 👑</p>';
+    return '<table class="stats"><tr><th>مرحله</th><th>برنده شگفتی</th><th>حذف‌شده</th><th>نتیجه</th></tr>' +
+      ups.map(u => '<tr><td>' + esc(u.roundTitle) + '</td><td>' + esc(Engine.teamName(t, u.winner)) + ' <span class="n">(' + 'سید ' + Engine.faNum(u.seedW) + ')</span></td>' +
+        '<td>' + esc(Engine.teamName(t, u.loser)) + ' <span class="n">(' + 'سید ' + Engine.faNum(u.seedL) + ')</span></td>' +
+        '<td>' + esc(Export.scoreText(t, u.m)) + '</td></tr>').join('') + '</table>';
+  }
+  /* بلوک رپشاژ در آمار تک‌حذفی */
+  function repechageStatsHtml(t) {
+    const r = t.repechage;
+    if (!r) return '';
+    const grp = (ids, label) => !ids || !ids.length ? '' :
+      '<h4 class="mini-title">' + label + ' <span class="count">' + Engine.faNum(ids.length) + '</span></h4>' +
+      '<div class="chip-row">' + ids.map(id => '<span class="chip static">' + avatar(teamById(t, id)) + esc(Engine.teamName(t, id)) + '</span>').join('') + '</div>';
+    const po = r.playoff && r.playoff.status === 'done' && r.playoff.result
+      ? '<p class="note">پل‌آف سوم: ' + esc(Engine.teamName(t, r.playoff.result.winner)) + ' برنده مقابل ' + esc(Engine.teamName(t, r.playoff.result.loser)) + ' (' + esc(Export.scoreText(t, r.playoff)) + ')</p>'
+      : '<p class="note">پل‌آف سوم هنوز برگزار نشده است.</p>';
+    return '<h3 class="block-title">🥉 شانس مجدد (رپشاژ)</h3><div class="panel pad">' +
+      grp(r.champLosers, 'دسته بازندگان به قهرمان') + grp(r.runnerLosers, 'دسته بازندگان به نایب‌قهرمان') + po + '</div>';
+  }
+  function renderStatsSingle(t, box, ctx, champ) {
+    return statsBlockHead('خلاصه تک‌حذفی ⚽', 'summary') + singleSummaryHtml(ctx) + podiumHtmlOf(t, ctx.rank) + champBlockHtml(t, champ) +
+      statsBlockHead('رده‌بندی نهایی', 'rank') + ctx.rank.map((r, i) => {
+        return '<div class="rank-row"><span class="pos">' + (i < 3 ? MEDALS[i] + ' ' : '') + Engine.faNum(i + 1) + '</span>' +
+          avatar(teamById(t, r.id)) + '<span class="nm">' + esc(Engine.teamName(t, r.id)) + '</span><span class="ti">' + esc(r.title) + '</span></div>';
+      }).join('') +
+      statsBlockHead('حذف‌شدگان به تفکیک دور', 'special') + exitBucketsHtml(t) +
+      statsBlockHead('شگفتی‌های جام 🎯', 'special') + upsetsHtml(t) +
+      statsBlockHead('جدول عملکرد تیم‌ها', 'perf') + perfTableHtml(ctx, false, true) + repechageStatsHtml(t) + fairHtmlOf(ctx) + statsBlockHead('گلزنان و ستارگان ⭐', 'scorers') + mvpHtmlOf(t, ctx, true) + scorersHtml(t, true);
+  }
+  /* آمار آسیایی: جدول جلو / پشت جدول + نقشه سقوط */
+  function renderStatsAsian(t, box, ctx, champ) {
+    const fb = Engine.asianFrontBack(t);
+    const drops = Engine.asianDropMap(t);
+    const avg = ctx.ov.done ? String((ctx.ov.avg || 0).toFixed(1)).replace(/[0-9.]+/g, d => Engine.faNum(d)) : '—';
+    const summary = '<div class="stat-grid asian-grid">' +
+      statCard(ctx.ov.done + ' / ' + ctx.ov.total, 'بازی انجام‌شده', ctx.ov.done, '⚽') +
+      statCard(ctx.ov.left, 'بازی باقی‌مانده', ctx.ov.left, '⏳') +
+      statCard(ctx.ov.goals, 'گل', ctx.ov.goals, '🥅') +
+      statCard(avg, 'میانگین گل', null, '📊') +
+      statCard(ctx.ov.byes, 'استراحت (B)', ctx.ov.byes, '💤') +
+      statCard(fb.front.length + fb.back.length + fb.place.length, 'گروه مقامی', null, '🗂️') + '</div>';
+    const stageBlock = (title, icon, groups, emptyMsg) => {
+      if (!groups.length) return '';
+      const doneN = groups.reduce((n, g) => n + g.matches.filter(m => m.status === 'done').length, 0);
+      const totalN = groups.reduce((n, g) => n + g.matches.length, 0);
+      return '<h3 class="block-title">' + icon + ' ' + title + ' <span class="count">' + Engine.faNum(doneN) + ' / ' + Engine.faNum(totalN) + '</span></h3>' +
+        groups.map(g => '<h4 class="mini-title">' + esc(g.title) + ' <span class="count">' +
+          Engine.faNum(g.matches.filter(m => m.status === 'done').length) + ' / ' + Engine.faNum(g.matches.length) + '</span></h4>' +
+          (g.matches.length ? '<div class="chip-row">' + g.matches.map(m => {
+            const done = m.status === 'done' && m.result;
+            return '<span class="chip static">' + esc(Engine.teamName(t, m.a)) + ' × ' + esc(Engine.teamName(t, m.b)) +
+              (done ? ' <span class="n">' + esc(Export.scoreText(t, m)) + '</span>' : ' <span class="n">⏳</span>') + '</span>';
+          }).join('') + '</div>' : '<p class="note">بازی‌ای نیست.</p>')).join('');
+    };
+    const dropHtml = !drops.length ? '<p class="panel pad note-panel">هنوز باختی ثبت نشده است.</p>'
+      : '<table class="stats"><tr><th>دور باخت</th><th>تیم</th><th>بازه مقامی</th><th>رتبه فعلی</th></tr>' +
+        drops.map(d => '<tr><td>' + esc(d.roundTitle) + '</td><td>' + avatar(teamById(t, d.id)) + ' ' + esc(Engine.teamName(t, d.id)) + '</td><td>' + esc(d.band) + '</td><td>' + esc(d.finalRank || 'در جریان') + '</td></tr>').join('') + '</table>';
+    return statsBlockHead('خلاصه آسیایی 🏯', 'summary') + summary + podiumHtmlOf(t, ctx.rank) + champBlockHtml(t, champ) +
+      stageBlock('جدول جلو (مقام ۱ تا نیمه بالا)', '🟢', fb.front, '') +
+      stageBlock('تعیین مقام‌ها', '🎯', fb.place, '') +
+      stageBlock('پشت جدول (نیمه پایین مقام‌ها)', '🔵', fb.back, '') +
+      statsBlockHead('نقشه سقوط مقامی 🪂', 'special') + dropHtml +
+      statsBlockHead('رده‌بندی کامل آسیایی', 'rank') + ctx.rank.map((r, i) => {
+        return '<div class="rank-row"><span class="pos">' + (i < 3 ? MEDALS[i] + ' ' : '') + Engine.faNum(i + 1) + '</span>' +
+          avatar(teamById(t, r.id)) + '<span class="nm">' + esc(Engine.teamName(t, r.id)) + '</span><span class="ti">' + esc(r.title) + '</span></div>';
+      }).join('') +
+      statsBlockHead('جدول عملکرد تیم‌ها', 'perf') + perfTableHtml(ctx, true, true) + fairHtmlOf(ctx) + statsBlockHead('گلزنان و ستارگان ⭐', 'scorers') + mvpHtmlOf(t, ctx, true) + scorersHtml(t, true);
+  }
+  function lossBadge(n) {
+    return n >= 2 ? '<span class="loss-pill out">❌ ' + Engine.faNum(n) + ' باخت • حذف</span>'
+      : n === 1 ? '<span class="loss-pill warn">⚠️ ' + Engine.faNum(n) + ' باخت</span>'
+      : '<span class="loss-pill ok">✅ بدون باخت</span>';
+  }
+  function renderStatsDouble(t, box, ctx, champ) {
+    const ov = Engine.deOverview(t);
+    const board = Engine.deTeamBoard(t);
+    const fromLB = Engine.deChampFromLosers(t);
+    const avg = ov.done ? String((ov.avg || 0).toFixed(1)).replace(/[0-9.]+/g, d => Engine.faNum(d)) : '—';
+    const summary = '<div class="stat-grid double-grid">' +
+      statCard(ov.wbDone + ' / ' + ov.wb, 'بازی جدول برنده‌ها', ov.wbDone, '🟢') +
+      statCard(ov.lbDone + ' / ' + ov.lb, 'بازی جدول بازنده‌ها', ov.lbDone, '🔴') +
+      statCard(ov.gfDone + ' / ' + ov.gf, 'فینال بزرگ', ov.gfDone, '🏆') +
+      statCard(ov.left, 'بازی باقی‌مانده', ov.left, '⏳') +
+      statCard(ov.goals, 'گل', ov.goals, '🥅') +
+      statCard(avg, 'میانگین گل', null, '📊') +
+      statCard(ov.byes, 'استراحت (B)', ov.byes, '💤') +
+      statCard(t.teams.filter(tm => (Engine.deLosses(t)[tm.id] || 0) >= 2).length, 'حذف‌شده (۲ باخت)', null, '❌') + '</div>';
+    const champNote = champ
+      ? '<p class="note">' + (fromLB ? '👑 این قهرمان از جدول بازنده‌ها برگشته و در فینال بزرگ دوباره برده است.' : '👑 این قهرمان بدون باخت از جدول برنده‌ها قهرمان شد.') + '</p>' : '';
+    const run = fromLB ? Engine.deLoserRun(t, t.champion) : [];
+    const runHtml = !fromLB ? '' : (!run.length ? '<p class="panel pad note-panel">زنجیره برد بازنده‌ها ثبت نشده است.</p>'
+      : '<div class="timeline">' + run.map((p, i) =>
+        '<div class="tl-row"><span class="tl-dot">' + (i === run.length - 1 ? '🏆' : '🔥') + '</span>' +
+        '<div class="tl-body"><div class="tl-title">' + esc(p.roundTitle) + ' • سطح ' + Engine.faNum(p.level + 1) + '</div>' +
+        '<div class="tl-sub">برد ' + esc(Export.scoreText(t, p.m)) + ' مقابل ' + esc(Engine.teamName(t, p.opp)) + '</div></div></div>'
+      ).join('') + '</div>');
+    const lbElims = Engine.deLbElims(t);
+    const elimHtml = !lbElims.length ? '<p class="panel pad note-panel">هنوز حذفی در جدول بازنده‌ها ثبت نشده است.</p>'
+      : lbElims.map(b =>
+        '<h4 class="mini-title">حذف در سطح ' + Engine.faNum(b.level + 1) + ' <span class="count">' + Engine.faNum(b.ids.length) + ' تیم</span></h4>' +
+        '<div class="chip-row">' + b.ids.map(id =>
+          '<span class="chip static">' + avatar(teamById(t, id)) + esc(Engine.teamName(t, id)) + '</span>').join('') + '</div>'
+      ).join('');
+    return statsBlockHead('خلاصه دوحذفی 🥊', 'summary') + summary + podiumHtmlOf(t, ctx.rank) + champBlockHtml(t, champ) + champNote +
+      (fromLB ? statsBlockHead('مسیر صعود از جدول بازنده‌ها 🔥', 'special') + runHtml : '') +
+      statsBlockHead('رده‌بندی نهایی دوحذفی', 'rank') + ctx.rank.map((r, i) => {
+        return '<div class="rank-row"><span class="pos">' + (i < 3 ? MEDALS[i] + ' ' : '') + Engine.faNum(i + 1) + '</span>' +
+          avatar(teamById(t, r.id)) + '<span class="nm">' + esc(Engine.teamName(t, r.id)) + '</span><span class="ti">' + esc(r.title) + '</span></div>';
+      }).join('') +
+      '<h3 class="block-title">محل حذف (عین deFinalRank)</h3>' + elimHtml +
+      statsBlockHead('رکورد تفکیکی W / LB (بدون مساوی)', 'perf') + '<div class="table-scroll"><table class="stats de-board"><tr><th>تیم</th><th>برد W</th><th>باخت W</th><th>برد LB</th><th>باخت LB</th><th>فینال بزرگ</th><th>باخت کل</th><th>وضعیت</th></tr>' +
+      board.map(r => {
+        const gfTxt = (r.wG || r.lG) ? (Engine.faNum(r.wG) + ' برد • ' + Engine.faNum(r.lG) + ' باخت') : '—';
+        return '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.wW) + '</td><td>' + Engine.faNum(r.lW) +
+          '</td><td class="hot">' + Engine.faNum(r.wL) + '</td><td>' + Engine.faNum(r.lL) +
+          '</td><td>' + gfTxt + '</td><td><strong>' + Engine.faNum(r.losses) + '</strong></td><td>' + lossBadge(r.losses) + '</td></tr>';
+      }).join('') + '</table></div>' +
+      fairHtmlOf(ctx) + statsBlockHead('گلزنان و ستارگان ⭐', 'scorers') + mvpHtmlOf(t, ctx, true) + scorersHtml(t, true);
+  }
+  function formPillsOf(t, teamId) {
+    const f = Engine.rrForm(t, teamId);
+    if (!f.length) return '<span class="note">—</span>';
+    return '<span class="form-pills">' + f.map(x =>
+      '<span class="form-pill ' + (x.d ? 'd' : x.w ? 'w' : 'l') + '" title="' + esc(Export.scoreText(t, x.m)) + '"></span>'
+    ).join('') + '</span>';
+  }
+  function renderStatsRound(t, box, ctx, champ) {
+    const ov = Engine.rrOverview(t);
+    const tbl = Engine.leagueTable(t);
+    const leaders = Engine.rrLeaderByRound(t);
+    const ad = Engine.rrAttackDefence(t);
+    const avgPts = v => v.played ? String((v.pts / v.played).toFixed(2)).replace(/[0-9.]+/g, d => Engine.faNum(d)) : '—';
+    const avgGoals = ov.done ? String((ov.avg || 0).toFixed(1)).replace(/[0-9.]+/g, d => Engine.faNum(d)) : '—';
+    const leaderNow = tbl.length ? tbl[0] : null;
+    const summary = '<div class="stat-grid round-grid">' +
+      statCard(ov.done + ' / ' + ov.total, 'بازی انجام‌شده', ov.done, '⚽') +
+      statCard(ov.left, 'بازی باقی‌مانده', ov.left, '⏳') +
+      statCard(ov.draws, 'مساوی', ov.draws, '🤝') +
+      statCard(ov.goals, 'گل', ov.goals, '🥅') +
+      statCard(avgGoals, 'میانگین گل', null, '📊') +
+      statCard('۳/' + ov.points.win + '/' + ov.points.draw + '/' + ov.points.loss, 'برد/مساوی/باخت', null, '🏅') + '</div>';
+    const champHtml = leaderNow
+      ? '<div class="panel pad stats-champ"><div class="champion-emblem">🏆</div>' +
+        (ov.left === 0
+          ? '<div class="champ-label">🏆 قهرمان گروه</div><div class="champ-name">' + esc(leaderNow.name) + '</div><p>' + Engine.faNum(leaderNow.pts) + ' امتیاز • ' + Engine.faNum(leaderNow.played) + ' بازی</p>'
+          : '<div class="champ-label">صدرنشین فعلی ⭐</div><div class="champ-name">' + esc(leaderNow.name) + '</div><p>' + Engine.faNum(leaderNow.pts) + ' امتیاز • ' + Engine.faNum(ov.left) + ' بازی مانده</p>') + '</div>'
+      : '<div class="panel pad stats-champ"><div class="champion-emblem">🏆</div><h3>هنوز بازی‌ای انجام نشده</h3></div>';
+    const leagueRows = !tbl.length ? '<p class="panel pad note-panel">تیمی نیست.</p>'
+      : '<div class="table-scroll"><table class="stats league-table"><tr><th>#</th><th>تیم</th><th>بازی</th><th>برد</th><th>مساوی</th><th>باخت</th><th>زده</th><th>خورده</th><th>تفاضل</th><th>امتیاز</th><th>معدل</th><th>فرم ۵ بازی</th></tr>' +
+        tbl.map(r =>
+          '<tr' + (r.rank === 1 ? ' class="leader-row"' : '') + '><td>' + (r.rank <= 3 ? MEDALS[r.rank - 1] + ' ' : '') + Engine.faNum(r.rank) + '</td>' +
+          '<td>' + avatar(r.tm) + ' ' + esc(r.name) + '</td><td>' + Engine.faNum(r.played) + '</td><td>' + Engine.faNum(r.won) +
+          '</td><td class="hot">' + Engine.faNum(r.drawn) + '</td><td>' + Engine.faNum(r.lost) + '</td><td>' + Engine.faNum(r.gf) +
+          '</td><td>' + Engine.faNum(r.ga) + '</td><td>' + Engine.faNum(r.gd) + '</td><td><strong>' + Engine.faNum(r.pts) + '</strong></td>' +
+          '<td>' + avgPts(r) + '</td><td>' + formPillsOf(t, r.id) + '</td></tr>'
+        ).join('') + '</table></div>' +
+        '<p class="note">مرتب‌سازی: امتیاز ← تفاضل ← زده. امتیازها: برد ' + Engine.faNum(ov.points.win) + ' • مساوی ' + Engine.faNum(ov.points.draw) + ' • باخت ' + Engine.faNum(ov.points.loss) + '</p>';
+    const bestHtml = !ad.attack ? '' :
+      '<div class="grid2">' +
+      '<div class="champ"><div class="t">🔥 بهترین خط حمله</div><div class="n">' + esc(ad.attack.name) + '</div><div class="t">' + Engine.faNum(ad.attack.gf) + ' زده در ' + Engine.faNum(ad.attack.played) + ' بازی</div></div>' +
+      '<div class="champ"><div class="t">🧱 بهترین خط دفاع</div><div class="n">' + esc(ad.defence.name) + '</div><div class="t">' + Engine.faNum(ad.defence.ga) + ' خورده در ' + Engine.faNum(ad.defence.played) + ' بازی</div></div></div>';
+    const leadHtml = !leaders.length ? '' :
+      '<h3 class="block-title">صدرنشین هفته‌به‌هفته 👑</h3><div class="timeline">' +
+      leaders.map((L, i) => {
+        const changed = i > 0 && leaders[i - 1].leader && L.leader && leaders[i - 1].leader.id !== L.leader.id;
+        return '<div class="tl-row"><span class="tl-dot">' + (i === leaders.length - 1 ? '🏆' : changed ? '🔄' : '📌') + '</span>' +
+          '<div class="tl-body"><div class="tl-title">' + esc(L.title) + '</div>' +
+          '<div class="tl-sub">' + (L.leader ? esc(L.leader.name) + ' با ' + Engine.faNum(L.leader.pts) + ' امتیاز' + (changed ? ' (تغییر صدر!)' : '') : 'هنوز بازی‌ای انجام نشده') + '</div></div></div>';
+      }).join('') + '</div>';
+    return statsBlockHead('خلاصه لیگ 🔄', 'summary') + summary + champHtml + bestHtml +
+      statsBlockHead('جدول لیگ (ثبت نتایج گروه)', 'perf') + leagueRows + statsBlockHead('صدرنشین هفته‌به‌هفته 👑', 'special') + leadHtml +
+      statsBlockHead('رده‌بندی گروه', 'rank') + ctx.rank.map((r, i) => {
+        return '<div class="rank-row"><span class="pos">' + (i < 3 ? MEDALS[i] + ' ' : '') + Engine.faNum(i + 1) + '</span>' +
+          avatar(teamById(t, r.id)) + '<span class="nm">' + esc(Engine.teamName(t, r.id)) + '</span><span class="ti">' + esc(r.title) + '</span></div>';
+      }).join('') +
+      fairHtmlOf(ctx) + statsBlockHead('گلزنان و ستارگان ⭐', 'scorers') + mvpHtmlOf(t, ctx, true) + scorersHtml(t, true);
+  }
   function renderStats() {
     const t = Store.active();
     const box = $('statsContent');
@@ -1014,56 +1274,16 @@ const UI = (() => {
       Store.save();
       setTimeout(celebrate, 350);
     }
-    const rows = t.teams.map(tm => Object.assign({ tm }, Engine.record(t, tm.id)))
-      .sort((a, b) => b.won - a.won || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
-    const rank = Engine.finalRank(t);
-    const fair = [...rows].sort((a, b) => a.fair - b.fair || a.y - b.y);
-    const mvpBoard = Engine.tournamentMvp(t);
-    const mvpMeta = (typeof SPORTS_META !== 'undefined' && (SPORTS_META[t.sport] || SPORTS_META.custom));
-    const primaryLbl = ((mvpMeta.mvpStats.find(s => s.key === mvpMeta.primary)) || {}).label || '';
-    // خلاصه آماری
-    const doneMs = Engine.allMatches(t).filter(x => !x.m.hidden && x.m.status === 'done' && x.m.result && x.m.result.type === 'score');
-    const totalGoals = doneMs.reduce((n, x) => { const tt = Engine.totals(x.m); return n + (Number(tt.a) || 0) + (Number(tt.b) || 0); }, 0);
-    const avgGoals = doneMs.length ? (totalGoals / doneMs.length).toFixed(1) : '۰';
-    const topWin = rows.reduce((mx, r) => Math.max(mx, r.won || 0), 0);
-    const summaryHtml = '<div class="stat-grid">' +
-      statCard(doneMs.length, 'بازی', doneMs.length, '⚽') +
-      statCard(totalGoals, 'گل', totalGoals, '🥅') +
-      statCard(String(avgGoals).replace(/[0-9.]+/g, d => Engine.faNum(d)), 'میانگین گل', null, '📊') +
-      statCard(topWin, 'بیشترین برد', topWin, '🏅') + '</div>';
-    // سکوی سه نفره
-    const podiumHtml = rank.length >= 3 ? '<h3 class="block-title">سکوی قهرمانان</h3><div class="podium">' +
-      [rank[1], rank[0], rank[2]].map((r, i) => {
-        const first = r === rank[0];
-        const pos = rank.indexOf(r) + 1;
-        const rtm = teamById(t, r.id);
-        return '<div class="podium-item' + (first ? ' first' : '') + '"><div class="medal" aria-hidden="true">' + MEDALS[pos - 1] + '</div>' +
-          '<div class="nm">' + esc(Engine.teamName(t, r.id)) + '</div><div class="sub">' + esc(r.title) + '</div></div>';
-      }).join('') + '</div>' : '';
-    const mvpHtml = mvpBoard.length ? '<h3 class="block-title">ستارگان میدان ⭐</h3>' +
-      (mvpBoard[0].awards ? '<div class="champ"><div class="t">⭐ بهترین بازیکن تورنمنت</div><div class="n">' + esc(mvpBoard[0].name) + '</div><div class="t">' + Engine.faNum(mvpBoard[0].awards) + ' بار بهترین بازیکن' + (primaryLbl ? ' • ' + Engine.faNum(mvpBoard[0].main) + ' ' + primaryLbl : '') + '</div></div>' : '') +
-      '<table class="stats"><tr><th>بازیکن</th><th>تیم</th><th>بهترین بازیکن</th>' + (primaryLbl ? '<th>' + primaryLbl + '</th>' : '') + '</tr>' +
-      mvpBoard.map(p => '<tr><td>⭐ ' + esc(p.name) + '</td><td>' + esc(Engine.teamName(t, p.team)) + '</td><td>' + Engine.faNum(p.awards) + '</td>' + (primaryLbl ? '<td>' + Engine.faNum(p.main) + '</td>' : '') + '</tr>').join('') + '</table>' : '';
+    const isAsian = Engine.isAsian(t);
+    const isDouble = Engine.isDouble(t);
+    const isRound = Engine.isRoundRobin(t);
+    const title = isRound ? 'آمار لیگ دوره‌ای 🔄' : isDouble ? 'آمار جدول دوحذفی 🥊' : isAsian ? 'آمار جدول آسیایی 🏯' : 'آمار جدول تک‌حذفی 🏆';
+    const fmtBadge = isRound ? 'فصل ۵ • همه با هم • مساوی مجاز' : isDouble ? 'فصل ۴ • حذف با ۲ باخت' : isAsian ? 'فصل ۳ • رتبه‌بندی کامل' : 'فصل ۲ • یک باخت = حذف';
     box.innerHTML =
-      '<div class="view-top"><h3 class="block-title m-0">نتایج و رتبه‌بندی</h3><button class="action small" onclick="Export.pngStats()">🖼️ عکس آمار</button></div>';
+      '<div class="view-top"><h3 class="block-title m-0">' + title + '</h3><span class="chip static">' + fmtBadge + '</span><button class="action small" onclick="Export.pngStatsSummary()">🖼️ عکس خلاصه</button></div>';
     const paintStats = () => {
-      box.insertAdjacentHTML('beforeend',
-        summaryHtml + podiumHtml +
-        (champ
-          ? '<div class="panel pad stats-champ"><div class="champion-emblem">🏆</div><div class="champ-label">🏆 قهرمان تورنمنت</div><div class="champ-name">' + esc(champ.name) + '</div></div>' + champPathHtml(t)
-          : '<div class="panel pad stats-champ"><div class="champion-emblem">🏆</div><h3>قهرمان هنوز مشخص نشده</h3><p>' + Engine.faNum(Engine.allMatches(t).filter(x => x.m.status !== 'done' && !x.m.hidden).length) + ' بازی تا پایان باقی مانده است.</p></div>') +
-        '<h3 class="block-title">رده‌بندی نهایی</h3>' + rank.map((r, i) => {
-          const rtm = teamById(t, r.id);
-          return '<div class="rank-row"><span class="pos">' + (i < 3 ? MEDALS[i] + ' ' : '') + Engine.faNum(i + 1) + '</span>' +
-          avatar(rtm) +
-          '<span class="nm">' + esc(Engine.teamName(t, r.id)) + '</span><span class="ti">' + esc(r.title) + '</span></div>'; }).join('') +
-        '<h3 class="block-title">جدول عملکرد تیم‌ها</h3><table class="stats"><tr><th>تیم</th><th>بازی</th><th>برد</th><th>باخت</th><th>زده</th><th>خورده</th><th>تفاضل</th></tr>' +
-        rows.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.played) + '</td><td>' + Engine.faNum(r.won) +
-          '</td><td>' + Engine.faNum(r.lost) + '</td><td>' + Engine.faNum(r.gf) + '</td><td>' + Engine.faNum(r.ga) +
-          '</td><td>' + Engine.faNum(r.gf - r.ga) + '</td></tr>').join('') + '</table>' +
-        '<h3 class="block-title">بازی جوانمردانه</h3><table class="stats"><tr><th>تیم</th><th>🟨</th><th>🟥</th><th>امتیاز منفی</th></tr>' +
-        fair.map(r => '<tr><td>' + esc(r.tm.name) + '</td><td>' + Engine.faNum(r.y) + '</td><td>' + Engine.faNum(r.r) +
-          '</td><td>' + Engine.faNum(r.fair) + '</td></tr>').join('') + '</table>' + mvpHtml + scorersHtml(t));
+      const ctx = statsContext(t);
+      box.insertAdjacentHTML('beforeend', isRound ? renderStatsRound(t, box, ctx, champ) : isDouble ? renderStatsDouble(t, box, ctx, champ) : isAsian ? renderStatsAsian(t, box, ctx, champ) : renderStatsSingle(t, box, ctx, champ));
     };
     if (t.teams.length > 12 && !reducedMotion()) {
       box.insertAdjacentHTML('beforeend', skelBars(6));
@@ -1084,14 +1304,14 @@ const UI = (() => {
       ).join('') + '</div>';
   }
 
-  function scorersHtml(t) {
+  function scorersHtml(t, bare) {
     const tab = Engine.scorersTable(t);
     if (!tab.length) {
       if (t.sport !== 'football' && t.sport !== 'futsal' && t.settings.scoring !== 'goals') return '';
-      return '<h3 class="block-title">⚽ گلزنان و پاسورها</h3><p class="panel pad note-panel">هنوز گلی ثبت نشده. از کارت هر بازی، گلزن‌ها را اضافه کن.</p>';
+      return (bare ? '' : '<h3 class="block-title">⚽ گلزنان و پاسورها</h3>') + '<p class="panel pad note-panel">هنوز گلی ثبت نشده. از کارت هر بازی، گلزن‌ها را اضافه کن.</p>';
     }
     const top = tab[0];
-    return '<h3 class="block-title">⚽ گلزنان برتر</h3>' +
+    return (bare ? '' : '<h3 class="block-title">⚽ گلزنان برتر</h3>') +
       '<div class="champ"><div class="t">👟 آقای گل</div><div class="n">' + esc(top.name) + '</div>' +
       '<div class="t">' + esc(Engine.teamName(t, top.team)) + ' • ' + Engine.faNum(top.goals) + ' گل' + (top.assists ? ' • ' + Engine.faNum(top.assists) + ' پاس گل' : '') + '</div></div>' +
       '<table class="stats"><tr><th>#</th><th>بازیکن</th><th>تیم</th><th>⚽ گل</th><th>🅰️ پاس</th><th>بازی</th></tr>' +
@@ -1320,8 +1540,8 @@ const UI = (() => {
         const c = Engine.calcInfo(Math.max(2, t.teams.length));
         cb.innerHTML = '<strong>📐 محاسبات کتابی (' + Engine.faNum(t.teams.length) + ' شرکت‌کننده)</strong><br>' +
           'مبنا: ' + Engine.faNum(c.base) + ' (۲ به توان ' + Engine.faNum(c.rounds) + ') • دور: ' + Engine.faNum(c.rounds) +
-          ' • کل: ' + Engine.faNum(c.total) + ' (n−۱) • استراحت: ' + Engine.faNum(c.byes) +
-          ' • دور اول: ' + Engine.faNum(c.firstMatches) + ' مسابقه • جمع جفت‌سید: ' + Engine.faNum(c.sum) +
+      ' • کل: ' + Engine.faNum(c.total) + ' (n−۱) • استراحت: ' + Engine.faNum(c.byes) +
+      ' • دور اول روی کاغذ: ' + Engine.faNum(c.drawnMatches) + ' (واقعی ' + Engine.faNum(c.realFirst) + ') • جمع جفت‌سید: ' + Engine.faNum(c.sum) +
           '<br><span class="muted">روش چیدمان: ' + esc(drawMethodFa(t)) + '</span>';
       }
     }
@@ -1343,8 +1563,17 @@ const UI = (() => {
       if (guardStructural()) return;
       t.settings.series = series;
     }
-    t.settings.scoring = $('setScoring').value;
-    t.settings.byeTo = $('setBye').value;
+    const scoring = $('setScoring').value;
+    if (scoring !== t.settings.scoring) {
+      if (guardStructural('تغییر نوع امتیاز نتایج ثبت‌شده را بی‌معنی می‌کند. جدول را ریست کن.')) return;
+      t.settings.scoring = scoring;
+    }
+    const byeTo = $('setBye').value;
+    if (byeTo !== t.settings.byeTo) {
+      if (guardStructural('تغییر قرعه استراحت نیاز به چیدمان مجدد دارد.')) return;
+      t.settings.byeTo = byeTo;
+    }
+    // byeDisplay فقط نمایشی است و به ریست نیاز ندارد
     if ($('setByeDisplay')) t.settings.byeDisplay = $('setByeDisplay').value;
     if ($('setPtWin')) {
       const pts = {
@@ -1906,6 +2135,9 @@ const UI = (() => {
   function updateScorerWarn() {
     const w = $('scorerWarn');
     if (!w) return;
+    const t0 = Store.active();
+    // فقط وقتی امتیاز «گل» است جمع گلزن با نتیجه قابل مقایسه است
+    if (!t0 || t0.settings.scoring !== 'goals') { w.textContent = ''; w.classList.remove('bad'); return; }
     const ctx = UI._scCtx || {};
     const m = { a: 0, b: 0 };
     (UI._scorers || []).forEach(s => {

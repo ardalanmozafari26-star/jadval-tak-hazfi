@@ -64,6 +64,10 @@ const Store = (() => {
   function updateTournament(id, patch) {
     const t = db.tournaments.find(x => x.id === id);
     if (!t) return null;
+    if (patch.targetSize != null && parseInt(patch.targetSize, 10) < t.teams.length) {
+      alert('ظرفیت کمتر از تعداد تیم‌های ثبت‌شده است.');
+      return null;
+    }
     Object.assign(t, patch);
     t.updatedAt = Date.now();
     save();
@@ -93,7 +97,9 @@ const Store = (() => {
   function addTeam(tid, data) {
     const t = db.tournaments.find(x => x.id === tid);
     if (!t) return null;
+    const cap = t.targetSize || 64;
     if (t.teams.length >= 64) { alert('حداکثر ۶۴ تیم مجاز است.'); return null; }
+    if (t.teams.length >= cap) { alert('ظرفیت جدول (' + cap + ' تیم) پر شد.'); return null; }
     const name = (data.name || '').trim();
     if (!name) { alert('نام تیم الزامی است.'); return null; }
     if (t.teams.some(x => x.name === name)) { alert('این نام تکراری است.'); return null; }
@@ -119,6 +125,13 @@ const Store = (() => {
     if (patch.name && t.teams.some(x => x.id !== teamId && x.name === patch.name.trim())) {
       alert('این نام تکراری است.'); return;
     }
+    if (patch.rank != null && String(patch.rank) !== String(tm.rank) && t.rounds && t.rounds.length) {
+      if (!confirm('تغییر سید بعد از قرعه‌کشی جدول را به‌هم می‌ریزد. جدول ریست شود؟')) return;
+      t.rounds = []; t.thirdPlace = null; t.champion = null; t.status = 'setup';
+      t.lbRounds = []; t.gf = null; t.losses = null; t.eliminated = null;
+      t.asianRounds = []; t.asianTree = null;
+      t.repechage = null; t.calc = null; t.drawMethod = null; t.drawSeeded = 0; t.celebrated = false;
+    }
     Object.assign(tm, patch);
     t.updatedAt = Date.now();
     save();
@@ -132,6 +145,7 @@ const Store = (() => {
       t.rounds = []; t.thirdPlace = null; t.champion = null; t.status = 'setup';
       t.lbRounds = []; t.gf = null; t.losses = null; t.eliminated = null;
       t.asianRounds = []; t.asianTree = null;
+      t.repechage = null; t.calc = null; t.drawMethod = null; t.drawSeeded = 0; t.celebrated = false;
     }
     t.teams = t.teams.filter(x => x.id !== teamId);
     t.updatedAt = Date.now();

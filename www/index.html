@@ -64,8 +64,13 @@
       <div id="homeContent" class="hidden">
         <div id="homeDash"></div>
         <div id="homeQuick" class="quick-actions"></div>
-        <p class="section-sub">نمای کلی تورنمنت</p>
-        <h2 class="section-title">خانه<span class="dot-accent">.</span></h2>
+        <div class="view-top">
+          <div>
+            <p class="section-sub">نمای کلی تورنمنت</p>
+            <h2 class="section-title">خانه<span class="dot-accent">.</span></h2>
+          </div>
+          <button class="action small" onclick="Export.pngHome()" aria-label="پوستر مربعی جام">🖼️ پوستر جام</button>
+        </div>
         <div class="cards-row" id="homeStats"></div>
         <h3 class="block-title" id="homeTodayTitle">بازی‌های امروز</h3>
         <div id="homeToday" class="stack"></div>
@@ -109,7 +114,7 @@
           <div class="toolbar-group">
             <button class="action small" onclick="UI.openDrawDialog()">🎲 قرعه‌کشی مجدد</button>
             <button class="action small" onclick="UI.toggleBracketMode()">📋 نمای فهرستی</button>
-            <button class="action small" onclick="Export.png()">🖼️ عکس</button>
+            <button class="action small" onclick="Export.png()">🖼️ عکس مربعی</button>
             <button class="action small" onclick="Export.print()">🖨️ چاپ/PDF</button>
             <button class="action small" onclick="Export.csv()">📊 CSV</button>
           </div>
@@ -146,7 +151,7 @@
     <section id="view-matches" class="view hidden">
       <div class="view-top">
         <h2 class="section-title">مسابقات</h2>
-        <button class="icon-btn" onclick="Export.pngMatches()" aria-label="خروجی عکس مسابقات">🖼️</button>
+        <button class="icon-btn" onclick="Export.pngMatches()" aria-label="خروجی مربعی مسابقات">🖼️</button>
       </div>
       <input id="matchSearch" class="field" placeholder="جستجوی بازی (نام تیم...)" aria-label="جستجوی بازی" oninput="UI.renderMatches()">
       <input type="hidden" id="matchFilter" value="all">

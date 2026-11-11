@@ -35,6 +35,8 @@ const Engine = (() => {
       byes: byeCount(n),
       firstMatches: firstRoundMatches(n),
       firstTeams: firstRoundTeams(n),
+      drawnMatches: base / 2, // بازی روی کاغذ در دور اول (شامل استراحت)
+      realFirst: n - lower,   // بازی واقعی روش توان کمتر
       sum: pairSum(base),
       isPow2: base === n
     };
@@ -293,6 +295,7 @@ const Engine = (() => {
     if (m === 'seeding') slotArr = placeTextbook(ids, n, slots);
     else if (m === 'combined') slotArr = placeCombined(ids, n, slots, opts.seededCount != null ? opts.seededCount : defaultSeeded(n));
     else if (m === 'sequential') slotArr = placeSequential(ids, n, slots);
+    else if ((t.settings.byeTo || 'top') === 'random' && m === 'lottery') slotArr = placeRandomBye(ids, n, slots);
     else slotArr = placeLotteryTextbook(ids, n, slots);
     if (method === 'manual') slotArr = placeTextbook(ids, n, slots);
     const seeded = (m === 'combined') ? (opts.seededCount != null ? opts.seededCount : defaultSeeded(n)) : (m === 'seeding' ? n : 0);
@@ -414,23 +417,32 @@ const Engine = (() => {
         if (m.pa) { const v = deSource(t, m.pa, m.paKind); if (v && m.a !== v) { m.a = v; changed = true; } }
         if (m.pb) { const v = deSource(t, m.pb, m.pbKind); if (v && m.b !== v) { m.b = v; changed = true; } }
       }
-      // ۲) استراحت خودکار در همهٔ سطوح
-      for (const { m } of all) {
-        if (m.status === 'done') continue;
-        const a = m.a, b = m.b;
-        if (!a || !b) continue;
-        const aBye = a === 'BYE', bBye = b === 'BYE';
-        if (aBye && bBye) {
-          m.status = 'done'; m.hidden = true;
-          m.result = { type: 'bye', winner: 'BYE', loser: 'BYE', note: 'استراحت' };
-          changed = true;
-        } else if (aBye !== bBye) {
-          const w = aBye ? b : a;
-          m.status = 'done';
-          m.result = { type: 'bye', winner: w, loser: 'BYE', note: 'صعود با قرعه استراحت (B)' };
-          changed = true;
+        // ۲) استراحت خودکار در همهٔ سطوح
+        for (const { m } of all) {
+          if (m.pa || m.pb) {
+            // اگر ورودی‌ها عوض شده و هر دو واقعی‌اند، پرچم/نتیجه bye قبلی را برگردان
+            if (m.a && m.b && m.a !== 'BYE' && m.b !== 'BYE') {
+              if (m.hidden) { m.hidden = false; changed = true; }
+              if (m.status === 'done' && m.result && m.result.type === 'bye') {
+                m.status = 'scheduled'; m.result = null; changed = true;
+              }
+            }
+          }
+          if (m.status === 'done') continue;
+          const a = m.a, b = m.b;
+          if (!a || !b) continue;
+          const aBye = a === 'BYE', bBye = b === 'BYE';
+          if (aBye && bBye) {
+            m.status = 'done'; m.hidden = true;
+            m.result = { type: 'bye', winner: 'BYE', loser: 'BYE', note: 'استراحت' };
+            changed = true;
+          } else if (aBye !== bBye) {
+            const w = aBye ? b : a;
+            m.status = 'done';
+            m.result = { type: 'bye', winner: w, loser: 'BYE', note: 'صعود با قرعه استراحت (B)' };
+            changed = true;
+          }
         }
-      }
       if (!changed) break;
     }
     // ۳) قهرمان
@@ -471,6 +483,7 @@ const Engine = (() => {
       for (const { m: d } of all) {
         if (d.pa !== src.id && d.pb !== src.id) continue;
         if (d.status === 'done') { walk(d); clearSelf(d); }
+        d.hidden = false;
         if (d.pa === src.id) d.a = null;
         if (d.pb === src.id) d.b = null;
       }
@@ -584,6 +597,7 @@ const Engine = (() => {
 
   function clearSelf(m) {
     m.status = 'scheduled'; m.result = null;
+    m.hidden = false;
     m.scoreA = null; m.scoreB = null; m.etA = null; m.etB = null;
     m.penA = null; m.penB = null; m.games = []; m.scorers = [];
     m.seriesWins = null;
@@ -600,19 +614,38 @@ const Engine = (() => {
 
   const num = v => { const n = parseInt(v, 10); return isNaN(n) || n < 0 ? null : n; };
 
-  /* برنده سری از روی بازی‌ها */
-  function seriesScore(games, needed) {
+  /* برنده سری از روی بازی‌ها + اعتبارسنجی تعداد و ترتیب برد */
+  function seriesScore(games, needed, series) {
+    const total = series || (needed * 2 - 1);
+    const played = games.filter(g => g.a !== null && g.b !== null);
+    if (played.length > total) return { error: 'تعداد بازی‌ها بیشتر از سقف سری (' + total + ') است.' };
     let wa = 0, wb = 0;
-    for (const g of games) {
-      if (g.a === null || g.b === null) continue;
+    for (const g of played) {
       if (g.a === g.b) return { error: 'بازی سری نمی‌تواند مساوی باشد.' };
       if (g.a > g.b) wa++; else wb++;
+      // بازی اضافه بعد از قطعی شدن سری
+      if (wa === needed || wb === needed) {
+        const idx = played.indexOf(g);
+        if (idx < played.length - 1) return { error: 'سری زودتر تمام شده؛ بازی اضافه ثبت شده است.' };
+        break;
+      }
     }
-    if (wa >= needed) return { winner: 'a', wa, wb };
-    if (wb >= needed) return { winner: 'b', wa, wb };
+    if (wa === needed) return { winner: 'a', wa, wb };
+    if (wb === needed) return { winner: 'b', wa, wb };
+    if (wa > needed || wb > needed) return { error: 'نتیجه سری نامعتبر است.' };
     return { error: 'نتیجه سری کامل نیست (برد ' + needed + ' بازی لازم است).' };
   }
 
+  function repechageMatches(t) {
+    const out = [];
+    if (!t.repechage) return out;
+    ['champBracket', 'runnerBracket'].forEach(k => {
+      const br = t.repechage[k === 'champBracket' ? 'champ' : 'runner'];
+      if (br && br.rounds) br.rounds.forEach(rd => rd.matches.forEach(m => out.push({ roundTitle: 'رپشاژ', m })));
+    });
+    if (t.repechage.playoff) out.push({ roundTitle: 'پل‌آف سوم', m: t.repechage.playoff });
+    return out;
+  }
   function isRepechageMatch(t, id) {
     if (!t.repechage) return false;
     if (t.repechage.playoff && t.repechage.playoff.id === id) return true;
@@ -636,7 +669,7 @@ const Engine = (() => {
       if (series > 1) {
         const needed = seriesNeeded(series);
         const games = (d.games || []).map(g => ({ a: num(g.a), b: num(g.b) }));
-        const r = seriesScore(games, needed);
+        const r = seriesScore(games, needed, series);
         if (r.error) { alert(r.error); return false; }
         nv.games = games;
         nv.seriesWins = { a: r.wa, b: r.wb };
@@ -721,6 +754,19 @@ const Engine = (() => {
 
   function swapTeams(t, idA, idB) {
     if (!t.rounds.length) return false;
+    if (isRoundRobin(t)) {
+      // جدول دوره‌ای با ترتیب سید/قرعه از نو ساخته می‌شود؛ جابه‌جایی باید درون‌جا باشد
+      for (const rd of t.rounds) for (const m of rd.matches) {
+        if (m.a === idA) m.a = idB; else if (m.a === idB) m.a = idA;
+        if (m.b === idA) m.b = idB; else if (m.b === idB) m.b = idA;
+        if (m.status === 'done' && m.result && (m.a === idA || m.a === idB || m.b === idA || m.b === idB)) {
+          if (m.result.winner !== m.a && m.result.winner !== m.b) clearSelf(m);
+        }
+      }
+      roundRefresh(t);
+      Store.save();
+      return true;
+    }
     const order = [];
     for (const m of t.rounds[0].matches) { order.push(m.a, m.b); }
     const ia = order.indexOf(idA), ib = order.indexOf(idB);
@@ -754,9 +800,10 @@ const Engine = (() => {
     return true;
   }
 
-  function allMatches(t) {
+  function allMatches(t, opts) {
     const out = [];
-    t.rounds.forEach(rd => rd.matches.forEach(m => out.push({ roundTitle: rd.title, m })));
+    const skipRep = opts && opts.skipRep;
+    (t.rounds || []).forEach(rd => rd.matches.forEach(m => out.push({ roundTitle: rd.title, m })));
     if (isDouble(t)) {
       (t.lbRounds || []).forEach(rd => rd.matches.forEach(m => out.push({ roundTitle: rd.title, m })));
       if (t.gf) out.push({ roundTitle: 'فینال بزرگ', m: t.gf });
@@ -764,12 +811,14 @@ const Engine = (() => {
     if (isAsian(t)) {
       (t.asianRounds || []).forEach(rd => rd.matches.forEach(m => out.push({ roundTitle: rd.title, m })));
     }
+    // رپشاژ هم جزو بازی‌های تورنمنت است تا record/exitRound/championPath یکسان شوند
+    if (!skipRep) repechageMatches(t).forEach(x => out.push(x));
     if (t.thirdPlace) out.push({ roundTitle: 'رده‌بندی', m: t.thirdPlace });
     return out;
   }
   /* شماره بازی در کل جدول */
   function matchNumber(t, matchId) {
-    const all = allMatches(t);
+    const all = visibleMatches(t);
     const i = all.findIndex(x => x.m.id === matchId);
     return i < 0 ? null : i + 1;
   }
@@ -804,15 +853,13 @@ const Engine = (() => {
 
   function record(t, teamId) {
     const r = { played: 0, won: 0, lost: 0, drawn: 0, gf: 0, ga: 0, y: 0, r: 0, fair: 0 };
-    const list = allMatches(t).slice();
-    // بازی‌های رپشاژ (شانس مجدد) هم در آمار تیم‌ها لحاظ می‌شوند
-    if (t.repechage) {
-      ['champ', 'runner'].forEach(g => {
-        const br = t.repechage[g === 'champ' ? 'champBracket' : 'runnerBracket'];
-        if (br && br.rounds) br.rounds.forEach(rd => rd.matches.forEach(m => list.push({ roundTitle: 'رپشاژ', m })));
-      });
-      if (t.repechage.playoff) list.push({ roundTitle: 'پل‌آف سوم', m: t.repechage.playoff });
-    }
+    // allMatches رپشاژ را هم دارد؛ تکرار نکن
+    const seen = {};
+    const list = allMatches(t).filter(x => {
+      if (seen[x.m.id]) return false;
+      seen[x.m.id] = true;
+      return true;
+    });
     for (const { m } of list) {
       if (m.status !== 'done' || !m.result || m.result.type === 'bye') continue;
       if (m.a !== teamId && m.b !== teamId) continue;
@@ -830,12 +877,13 @@ const Engine = (() => {
     return r;
   }
 
-  /* عمیق‌ترین راندی که تیم در آن بازی کرد */
+  /* عمیق‌ترین راندی که تیم در آن بازی کرد (بدون رده‌بندی و رپشاژ) */
   function exitRound(t, teamId) {
     if (t.champion === teamId) return 999;
     let best = -1;
-    for (const { m } of allMatches(t)) {
+    for (const { m } of allMatches(t, { skipRep: true })) {
       if (m.id === 'third') continue;
+      if (isRepechageMatch(t, m.id)) continue;
       if ((m.a === teamId || m.b === teamId) && m.round > best) best = m.round;
     }
     return best;
@@ -863,19 +911,22 @@ const Engine = (() => {
       if (m.status !== 'done' || !m.result) continue;
       const l = m.result.loser;
       if (!l || l === 'BYE' || l === champ) continue;
-      const d = m.kind === 'gf' ? 999 : (m.lbLevel != null ? m.lbLevel : -1);
+      // LB عمیق‌تر از WB است؛ GF بالاترین عمق
+      const d = m.kind === 'gf' ? 999 : (m.lbLevel != null ? 100 + m.lbLevel : 10 + (m.round || 0));
       if (elim[l] == null || d > elim[l]) elim[l] = d;
     }
+    const elimTitle = d => {
+      if (d >= 999) return 'حذف در فینال بزرگ';
+      if (d >= 100) return 'حذف در سطح ' + (d - 100 + 1) + ' جدول بازنده‌ها';
+      return 'حذف در دور ' + (d - 10 + 1) + ' جدول برنده‌ها';
+    };
     const rest = t.teams.filter(tm => !used[tm.id]);
     rest.sort((a, b) => (elim[b.id] != null ? elim[b.id] : -1) - (elim[a.id] != null ? elim[a.id] : -1));
     let lastD = null, title = '';
     for (const tm of rest) {
       const d = elim[tm.id];
       if (d == null) { if (!champ) out.push({ id: tm.id, title: 'در جریان' }); continue; }
-      if (d !== lastD) {
-        lastD = d;
-        title = (d >= 999) ? 'حذف در فینال بزرگ' : ('حذف در سطح ' + (d + 1) + ' جدول بازنده‌ها');
-      }
+      if (d !== lastD) { lastD = d; title = elimTitle(d); }
       out.push({ id: tm.id, title });
     }
     return out;
@@ -914,7 +965,9 @@ const Engine = (() => {
       front: slots / 2,
       back: slots / 2,
       total,
-      played: Math.max(0, total - (slots - n)),
+      // «بازی واقعی» را نمی‌شود با فرمول خطی حساب کرد — BYE آبشاری چند بازی bye می‌سازد.
+      // نمایش واقعی باید از statsOverview(t).total گرفته شود.
+      played: null,
       sum: pairSum(slots),
       isPow2: slots === n
     };
@@ -1047,20 +1100,27 @@ const Engine = (() => {
   /* به‌روزرسانی شرکت‌کنندگان دورهای رتبه‌بندی و پشت جدول + پاک‌سازی بازی‌هایی که ورودی‌شان تغییر کرده */
   function asianResolve(t) {
     const rounds = t.asianRounds || [];
-    for (const rd of rounds) {
-      for (const m of rd.matches) {
-        const a = asianSrcRef(t, m.srcA), b = asianSrcRef(t, m.srcB);
-        const na = a || null, nb = b || null;
-        if ((m.a || null) !== na || (m.b || null) !== nb) {
-          m.a = na; m.b = nb;
-          if (m.status === 'done') clearSelf(m);
-        }
-        if (m.status !== 'done' && m.a && m.b && (m.a === 'BYE' || m.b === 'BYE')) {
-          const w = (m.a === 'BYE') ? m.b : m.a;
-          m.status = 'done';
-          m.result = { type: 'bye', winner: w, loser: 'BYE', note: 'صعود با قرعه استراحت' };
+    // چند پاس تا پایداری: سطح دوم به ورودی‌ای وابسته است که در همین فراخوانی پر شده
+    for (let pass = 0; pass < 20; pass++) {
+      let changed = false;
+      for (const rd of rounds) {
+        for (const m of rd.matches) {
+          const a = asianSrcRef(t, m.srcA), b = asianSrcRef(t, m.srcB);
+          const na = a || null, nb = b || null;
+          if ((m.a || null) !== na || (m.b || null) !== nb) {
+            m.a = na; m.b = nb;
+            if (m.status === 'done') clearSelf(m);
+            changed = true;
+          }
+          if (m.status !== 'done' && m.a && m.b && (m.a === 'BYE' || m.b === 'BYE')) {
+            const w = (m.a === 'BYE') ? m.b : m.a;
+            m.status = 'done';
+            m.result = { type: 'bye', winner: w, loser: 'BYE', note: 'صعود با قرعه استراحت' };
+            changed = true;
+          }
         }
       }
+      if (!changed) break;
     }
   }
 
@@ -1212,7 +1272,10 @@ const Engine = (() => {
       else { A.drawn++; B.drawn++; A.pts += (P.draw || 0); B.pts += (P.draw || 0); }
     }
     rows.forEach(r => { r.gd = r.gf - r.ga; });
-    rows.sort((x, y) => (y.pts - x.pts) || (y.gd - x.gd) || (y.gf - x.gf) || String(x.name).localeCompare(String(y.name), 'fa'));
+    // تای‌بریک: امتیاز ← تفاضل ← زده ← برد بیشتر ← بازی جوانمردانه کمتر ← الفبا
+    const fairOf = r => (r.y || 0) + 3 * (r.r || 0);
+    rows.forEach(r => { r.fair = fairOf(r); });
+    rows.sort((x, y) => (y.pts - x.pts) || (y.gd - x.gd) || (y.gf - x.gf) || (y.won - x.won) || (fairOf(x) - fairOf(y)) || String(x.name).localeCompare(String(y.name), 'fa'));
     rows.forEach((r, i) => { r.rank = i + 1; });
     return rows;
   }
@@ -1237,6 +1300,79 @@ const Engine = (() => {
       id: r.id,
       title: r.rank === 1 ? 'قهرمان گروه 🏆' : (RR_ORDINALS[r.rank - 1] ? (RR_ORDINALS[r.rank - 1] + 'م') : faNum(r.rank) + 'م')
     }));
+  }
+
+  /* ---------- آمار اختصاصی دوره‌ای (فصل ۵، لیگ) ---------- */
+  /* بازی واقعی لیگ: hidden و BYE و bye نادیده گرفته می‌شود */
+  function rrCount(m) {
+    if (!m || m.hidden) return false;
+    if (m.a === 'BYE' || m.b === 'BYE') return false;
+    if (m.result && m.result.type === 'bye') return false;
+    return true;
+  }
+  function rrOverview(t) {
+    const all = (t.rounds || []).reduce((n, rd) => n + rd.matches.filter(rrCount).length, 0);
+    const done = (t.rounds || []).reduce((n, rd) => n + rd.matches.filter(m => rrCount(m) && m.status === 'done' && m.result).length, 0);
+    const tbl = leagueTable(t);
+    const draws = tbl.reduce((n, r) => n + (r.drawn || 0), 0) / 2;
+    let goals = 0;
+    for (const { m } of allMatches(t)) {
+      if (!rrCount(m) || m.status !== 'done' || !m.result || m.result.type !== 'score') continue;
+      const tt = totals(m);
+      goals += (Number(tt.a) || 0) + (Number(tt.b) || 0);
+    }
+    const P = (t.settings && t.settings.points) || { win: 3, draw: 1, loss: 0 };
+    return { total: all, done, left: Math.max(0, all - done), draws: Math.round(draws), goals,
+      avg: done ? goals / done : 0, points: P, rounds: (t.rounds || []).length };
+  }
+  /* فرم ۵ بازی اخیر هر تیم: W/D/L از جدید به قدیم (شامل مساوی) */
+  function rrForm(t, teamId) {
+    const out = [];
+    for (const { m } of allMatches(t)) {
+      if (!rrCount(m) || m.status !== 'done' || !m.result) continue;
+      if (m.result.type !== 'score' && m.result.type !== 'draw') continue;
+      if (m.a !== teamId && m.b !== teamId) continue;
+      out.push({ m, w: m.result.winner === teamId, d: m.result.type === 'draw' });
+    }
+    return out.slice(-5);
+  }
+  /* خلاصه تهاجمی/تدافعی لیگ */
+  function rrAttackDefence(t) {
+    const tbl = leagueTable(t);
+    if (!tbl.length) return { attack: null, defence: null };
+    let attack = tbl[0], defence = tbl[0];
+    tbl.forEach(r => {
+      if ((r.gf || 0) > (attack.gf || 0) || ((r.gf || 0) === (attack.gf || 0) && (r.played || 0) < (attack.played || 0))) attack = r;
+      if ((r.ga || 0) < (defence.ga || 0) || ((r.ga || 0) === (defence.ga || 0) && (r.played || 0) > (defence.played || 0))) defence = r;
+    });
+    return { attack, defence };
+  }
+  /* صدرنشین هفته‌به‌هفته: بعد از هر دور، با همان منطق leagueTable ولی فقط تا آن دور */
+  function rrLeaderByRound(t) {
+    const P = (t.settings && t.settings.points) || { win: 3, draw: 1, loss: 0 };
+    const out = [];
+    const rounds = t.rounds || [];
+    for (let upto = 0; upto < rounds.length; upto++) {
+      const agg = {};
+      t.teams.forEach(tm => { agg[tm.id] = { id: tm.id, name: tm.name, pts: 0, gd: 0, gf: 0, played: 0 }; });
+      for (let r = 0; r <= upto; r++) {
+        for (const m of (rounds[r].matches || [])) {
+          if (!rrCount(m) || m.status !== 'done' || !m.result || m.result.type !== 'score') continue;
+          if (!agg[m.a] || !agg[m.b]) continue;
+          const tt = totals(m);
+          agg[m.a].played++; agg[m.b].played++;
+          agg[m.a].gf += tt.a; agg[m.b].gf += tt.b;
+          agg[m.a].gd += tt.a - tt.b; agg[m.b].gd += tt.b - tt.a;
+          if (tt.a > tt.b) { agg[m.a].pts += (P.win || 0); agg[m.b].pts += (P.loss || 0); }
+          else if (tt.b > tt.a) { agg[m.b].pts += (P.win || 0); agg[m.a].pts += (P.loss || 0); }
+          else { agg[m.a].pts += (P.draw || 0); agg[m.b].pts += (P.draw || 0); }
+        }
+      }
+      const arr = Object.keys(agg).map(k => agg[k]).filter(x => x.played > 0);
+      arr.sort((x, y) => (y.pts - x.pts) || (y.gd - x.gd) || (y.gf - x.gf) || String(x.name).localeCompare(String(y.name), 'fa'));
+      out.push({ round: upto, title: rounds[upto].title, leader: arr.length ? arr[0] : null, played: arr.reduce((n, x) => n + x.played, 0) / 2 });
+    }
+    return out;
   }
 
   /* ================= پایان جدول دوره‌ای ================= */
@@ -1303,6 +1439,214 @@ const Engine = (() => {
       out.push({ id: x.id, title: bucketTitle });
     });
     return out;
+  }
+
+  /* ---------- آمار اختصاصی تک‌حذفی و آسیایی (فصل ۲ و ۳) ---------- */
+  /* بازی واقعی: مخفی، BYE و صعود با استراحت شمرده نمی‌شود */
+  function isRealMatch(x) {
+    const m = x && x.m ? x.m : x;
+    if (!m || m.hidden) return false;
+    if (m.a === 'BYE' || m.b === 'BYE') return false;
+    if (!m.result || m.result.type === 'bye') return false;
+    return true;
+  }
+  function realMatches(t) { return allMatches(t).filter(isRealMatch); }
+  /* بازی‌های قابل نمایش با احترام به «نمایش استراحت» */
+  function visibleMatches(t) {
+    const lower = (t.settings && t.settings.byeDisplay) === 'lower';
+    return allMatches(t).filter(x => {
+      if (x.m.hidden) return false;
+      if (lower && x.m.result && x.m.result.type === 'bye' && (x.m.round === 0 || x.roundTitle === 'رپشاژ')) return false;
+      return true;
+    });
+  }
+  /* شمار بازی‌های واقعی (انجام‌شده / باقی‌مانده) + تعداد استراحت کتابی */
+  function statsOverview(t) {
+    const real = visibleMatches(t).filter(x => x.m.a !== 'BYE' && x.m.b !== 'BYE' && !(x.m.result && x.m.result.type === 'bye'));
+    const done = real.filter(x => x.m.status === 'done' && x.m.result).length;
+    const byes = visibleMatches(t).filter(x => x.m.result && x.m.result.type === 'bye').length;
+    let goals = 0;
+    real.forEach(x => {
+      if (x.m.status !== 'done' || !x.m.result || x.m.result.type !== 'score') return;
+      const tt = totals(x.m);
+      goals += (Number(tt.a) || 0) + (Number(tt.b) || 0);
+    });
+    return { total: real.length, done, left: Math.max(0, real.length - done), byes, goals, avg: done ? (goals / done) : 0 };
+  }
+  /* سید عددی تیم بر اساس rank (۱ قوی‌ترین) — نه ترتیب ثبت‌نام */
+  function seededSorted(t) {
+    return [...(t.teams || [])].sort((a, b) => rankVal(a.rank) - rankVal(b.rank));
+  }
+  function seedRankOf(t, teamId) {
+    if (!teamId || teamId === 'BYE') return null;
+    const i = seededSorted(t).findIndex(x => x.id === teamId);
+    return i < 0 ? null : i + 1;
+  }
+  /* بازنده به تفکیک دور حذف (فقط جدول اصلی تک‌حذفی، بدون رده‌بندی/رپشاژ) */
+  function exitBuckets(t) {
+    const out = {};
+    (t.rounds || []).forEach((rd, r) => {
+      rd.matches.forEach(m => {
+        if (m.hidden || m.id === 'third') return;
+        if (m.status !== 'done' || !m.result) return;
+        if (m.result.type === 'bye') return;
+        const l = m.result.loser;
+        if (!l || l === 'BYE') return;
+        if (t.champion && l === t.champion) return;
+        const parts = (rd.matches.length || 1) * 2;
+        (out[r] = out[r] || { round: r, title: rd.title, parts, ids: [] }).ids.push(l);
+      });
+    });
+    return Object.keys(out).map(k => out[k]).sort((a, b) => b.round - a.round);
+  }
+  /* شگفتی جام: برد سید ضعیف‌تر مقابل سید قوی‌تر */
+  function cupUpsets(t) {
+    const out = [];
+    (t.rounds || []).forEach((rd, r) => {
+      rd.matches.forEach(m => {
+        if (m.hidden || m.id === 'third') return;
+        if (m.status !== 'done' || !m.result || m.result.type !== 'score') return;
+        const w = m.result.winner, l = m.result.loser;
+        const sw = seedRankOf(t, w), sl = seedRankOf(t, l);
+        if (sw == null || sl == null || sw <= sl) return;
+        out.push({ round: r, roundTitle: rd.title, winner: w, loser: l, seedW: sw, seedL: sl, m });
+      });
+    });
+    return out.sort((a, b) => (b.seedW - b.seedL) - (a.seedW - a.seedL)).slice(0, 5);
+  }
+  /* نقشه سقوط آسیایی: هر بازنده جدول جلو در کدام دور باخت و به کدام بازه مقامی رفت */
+  function asianDropMap(t) {
+    if (!isAsian(t)) return [];
+    const ranks = asianRankList(t);
+    const titleOf = id => (ranks.find(x => x.id === id) || {}).rank || null;
+    const out = [];
+    (t.rounds || []).forEach((rd, r) => {
+      rd.matches.forEach(m => {
+        if (m.hidden) return;
+        if (m.status !== 'done' || !m.result) return;
+        if (m.result.type === 'bye') return;
+        const l = m.result.loser;
+        if (!l || l === 'BYE') return;
+        const cnt = (rd.matches.length || 1) * 2;
+        const lo = Math.min(cnt, (t.teams || []).length);
+        const hi = Math.floor(cnt / 2) + 1;
+        const band = hi >= lo ? ('مقام ' + faNum(hi)) : ('مقام ' + faNum(hi) + ' تا ' + faNum(lo));
+        out.push({ round: r, roundTitle: rd.title, id: l, band, finalRank: titleOf(l) });
+      });
+    });
+    return out.sort((a, b) => a.round - b.round);
+  }
+  /* تفکیک آسیایی به جدول جلو / پشت جدول */
+  function asianFrontBack(t) {
+    const front = (t.rounds || []).map(rd => ({ title: rd.title, matches: (rd.matches || []).filter(m => !m.hidden) }));
+    const back = ((t.asianRounds || []).filter(rd => rd.kind === 'back'))
+      .map(rd => ({ title: rd.title, matches: (rd.matches || []).filter(m => !m.hidden) }));
+    const place = ((t.asianRounds || []).filter(rd => rd.kind !== 'back'))
+      .map(rd => ({ title: rd.title, matches: (rd.matches || []).filter(m => !m.hidden) }));
+    return { front, back, place };
+  }
+
+  /* ---------- آمار اختصاصی دوحذفی (فصل ۴) ---------- */
+  /* شمار واقعی بازی‌ها به تفکیک W / LB / GF؛ hidden و BYE نادیده گرفته می‌شود */
+  function deCount(m) {
+    if (!m || m.hidden) return false;
+    if (m.a === 'BYE' || m.b === 'BYE') return false;
+    if (m.result && m.result.type === 'bye') return false;
+    return true;
+  }
+  function deOverview(t) {
+    const wb = (t.rounds || []).reduce((n, rd) => n + rd.matches.filter(deCount).length, 0);
+    const wbDone = (t.rounds || []).reduce((n, rd) => n + rd.matches.filter(m => deCount(m) && m.status === 'done' && m.result).length, 0);
+    const lb = (t.lbRounds || []).reduce((n, rd) => n + rd.matches.filter(deCount).length, 0);
+    const lbDone = (t.lbRounds || []).reduce((n, rd) => n + rd.matches.filter(m => deCount(m) && m.status === 'done' && m.result).length, 0);
+    const gfOn = t.gf && deCount(t.gf) ? 1 : 0;
+    const gfDone = (t.gf && deCount(t.gf) && t.gf.status === 'done' && t.gf.result) ? 1 : 0;
+    const byes = deAllMatches(t).filter(x => !x.m.hidden && x.m.result && x.m.result.type === 'bye').length;
+    let goals = 0;
+    deAllMatches(t).forEach(x => {
+      if (!deCount(x.m) || x.m.status !== 'done' || !x.m.result || x.m.result.type !== 'score') return;
+      const tt = totals(x.m);
+      goals += (Number(tt.a) || 0) + (Number(tt.b) || 0);
+    });
+    const done = wbDone + lbDone + gfDone;
+    const total = wb + lb + gfOn;
+    return { wb, wbDone, lb, lbDone, gf: gfOn, gfDone, total, done, left: Math.max(0, total - done), byes, goals, avg: done ? goals / done : 0 };
+  }
+  /* رکورد تفکیکی هر تیم: برد/باخت در W و LB و GF + باخت کل */
+  function deTeamBoard(t) {
+    const rows = t.teams.map(tm => ({
+      tm, id: tm.id,
+      wW: 0, lW: 0, wL: 0, lL: 0, wG: 0, lG: 0,
+      played: 0, won: 0, lost: 0, gf: 0, ga: 0, y: 0, r: 0, fair: 0
+    }));
+    const byId = {};
+    rows.forEach(r => { byId[r.id] = r; });
+    for (const { m } of deAllMatches(t)) {
+      if (m.hidden || m.status !== 'done' || !m.result || m.result.type === 'bye') continue;
+      if (m.a === 'BYE' || m.b === 'BYE') continue;
+      const w = m.result.winner, l = m.result.loser;
+      const bucket = m.kind === 'gf' ? 'G' : (m.kind === 'lb' ? 'L' : 'W');
+      [w, l].forEach(id => {
+        if (!id || id === 'BYE' || !byId[id]) return;
+        byId[id].played++;
+        const tt = totals(m);
+        if (id === m.a) { byId[id].gf += tt.a; byId[id].ga += tt.b; }
+        else { byId[id].gf += tt.b; byId[id].ga += tt.a; }
+        const c = m.cards || {};
+        const y = id === m.a ? (c.ya || 0) : (c.yb || 0);
+        const rd = id === m.a ? (c.ra || 0) : (c.rb || 0);
+        byId[id].y += y; byId[id].r += rd; byId[id].fair += y + 3 * rd;
+      });
+      if (w && byId[w]) {
+        byId[w].won++;
+        if (bucket === 'W') byId[w].wW++; else if (bucket === 'L') byId[w].wL++; else byId[w].wG++;
+      }
+      if (l && byId[l] && l !== 'BYE') {
+        byId[l].lost++;
+        if (bucket === 'W') byId[l].lW++; else if (bucket === 'L') byId[l].lL++; else byId[l].lG++;
+      }
+    }
+    const losses = deLosses(t);
+    rows.forEach(r => { r.losses = losses[r.id] || 0; });
+    rows.sort((a, b) => b.won - a.won || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+    return rows;
+  }
+  /* آیا قهرمان از جدول بازنده‌ها آمده؟ (حداقل یک برد در LB داشته) */
+  function deChampFromLosers(t) {
+    if (!t.champion || !t.gf || t.gf.status !== 'done' || !t.gf.result) return false;
+    for (const { m } of deAllMatches(t)) {
+      if (m.kind !== 'lb' || m.hidden || m.status !== 'done' || !m.result || m.result.type === 'bye') continue;
+      if (m.result.winner === t.champion) return true;
+    }
+    return false;
+  }
+  /* زنجیره بردهای قهرمان در LB تا فینال بزرگ */
+  function deLoserRun(t, champId) {
+    const id = champId || t.champion;
+    if (!id) return [];
+    return deAllMatches(t)
+      .filter(x => x.m.kind === 'lb' && !x.m.hidden && x.m.status === 'done' && x.m.result && x.m.result.type !== 'bye' && x.m.result.winner === id)
+      .sort((a, b) => (a.m.lbLevel || 0) - (b.m.lbLevel || 0) || (a.m.index || 0) - (b.m.index || 0))
+      .map(x => ({ roundTitle: x.roundTitle, m: x.m, opp: x.m.result.loser, level: x.m.lbLevel || 0 }));
+  }
+  /* بازندگان هر سطح LB (برای نمایش محل حذف) — همه بازی‌های سطح */
+  function deLbElims(t) {
+    const out = {};
+    (t.lbRounds || []).forEach((rd, j) => {
+      rd.matches.forEach(m => {
+        if (m.hidden || m.status !== 'done' || !m.result) return;
+        if (m.result.type === 'bye') return;
+        const l = m.result.loser;
+        if (!l || l === 'BYE' || (t.champion && l === t.champion)) return;
+        const slot = (out[j] = out[j] || { level: j, title: rd.title, ids: [] });
+        if (!slot.ids.includes(l)) slot.ids.push(l);
+      });
+    });
+    return Object.keys(out).map(k => out[k]).sort((a, b) => b.level - a.level);
+  }
+  function lossesOf(t, id) {
+    const map = (t.losses && typeof t.losses === 'object') ? t.losses : deLosses(t);
+    return map[id] || 0;
   }
 
   /* بهترین بازیکن: سازگار با نسخه قدیمی (رشته متنی) و جدید (آبجکت رشته‌محور) */
@@ -1384,11 +1728,11 @@ const Engine = (() => {
     }).sort((a, b) => b.goals - a.goals || b.assists - a.assists || a.name.localeCompare(b.name, 'fa'));
   }
 
-  /* مسیر قهرمان تا جام: بردهای تیم قهرمان به ترتیب مرحله */
+  /* مسیر قهرمان تا جام: بردهای تیم قهرمان به ترتیب مرحله (بدون رپشاژ/رده‌بندی) */
   function championPath(t) {
     if (!t.champion) return [];
     const out = [];
-    for (const x of allMatches(t)) {
+    for (const x of allMatches(t, { skipRep: true })) {
       const m = x.m;
       if (m.id === 'third' || !m.result || m.result.type === 'bye') continue;
       if (m.result.winner !== t.champion) continue;
@@ -1602,6 +1946,7 @@ const Engine = (() => {
     if (m === 'seeding') arr = placeTextbook(ids, n, slots);
     else if (m === 'combined') arr = placeCombined(ids, n, slots, seededCount != null ? seededCount : defaultSeeded(n));
     else if (m === 'sequential') arr = placeSequential(ids, n, slots);
+    else if (m === 'manual') arr = placeTextbook(ids, n, slots);
     else arr = placeLotteryTextbook(ids, n, slots);
     const out = [];
     for (let i = 0; i + 1 < arr.length; i += 2) {
@@ -1609,12 +1954,8 @@ const Engine = (() => {
     }
     return out;
   }
-  /* سید متناظر یک تیم (ترتیب تیم‌ها در چیدمان = شماره سید) */
-  function seedOf(t, teamId) {
-    if (!teamId || teamId === 'BYE') return null;
-    const i = t.teams.findIndex(x => x.id === teamId);
-    return i < 0 ? null : i + 1;
-  }
+  /* سید متناظر یک تیم بر اساس rank (۱ قوی‌ترین) */
+  function seedOf(t, teamId) { return seedRankOf(t, teamId); }
 
   function todayISO() {
     const d = new Date();
@@ -1630,16 +1971,19 @@ const Engine = (() => {
 
   return {
     nextPow2, lowerPow2, baseFor, lowerFor, roundsCount, totalMatches, byeCount,
-    firstRoundMatches, firstRoundTeams, pairSum, calcInfo,
+    firstRoundMatches, firstRoundTeams, pairSum, calcInfo, sharedRankTitle, visibleMatches, repechageMatches,
     seedOrder, textbookOrder, placeTextbook, placeCombined, placeLotteryTextbook, defaultSeeded, normMethod,
-    previewPairs, seedOf,
+    previewPairs, seedOf, seededSorted,
     roundTitle, generateBracket, findMatch, teamName,
     setResult, clearResult, setSchedule, resetBracket, swapTeams,
     allMatches, matchNumber, record, finalRank, fairPoints, totals, displayScore,
     matchWinner, mvpName, mvpStatsLine, tournamentMvp, scorersTable, championPath, todayISO, faDate, faNum,
+    isRealMatch, realMatches, statsOverview, seedRankOf, exitBuckets, cupUpsets, asianDropMap, asianFrontBack,
     finalists, losersTo, buildRepechage, setRepechageResult, clearRepechage, findRepMatch, isRepechageMatch,
     buildDouble, isDouble, deAllMatches, deRefresh, deLosses, deCalcInfo, deLbSizes, deSource, deClearDown,
+    deOverview, deTeamBoard, deChampFromLosers, deLoserRun, deLbElims,
     buildAsian, isAsian, asianCalcInfo, asianAllMatches, asianFinalRank, asianResolve, asianRankList, asianTotalMatches,
-    buildRoundRobin, isRoundRobin, roundCalcInfo, leagueTable, roundFinalRank, roundRefresh, RR_ORDINALS
+    buildRoundRobin, isRoundRobin, roundCalcInfo, leagueTable, roundFinalRank, roundRefresh, RR_ORDINALS,
+    rrOverview, rrForm, rrAttackDefence, rrLeaderByRound,
   };
 })();
