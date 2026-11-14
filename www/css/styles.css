@@ -306,7 +306,7 @@ input,select,textarea{color-scheme:dark;}
 .hint-note{font-size:var(--fs-xs); color:var(--muted); line-height:var(--lh-loose); margin:var(--sp-2) 0 0;}
 
 /* ---------- ۵) کامپوننت‌های پایه ---------- */
-.panel{background:var(--card); border:1px solid var(--border); border-radius:var(--radius);}
+.panel{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow-wrap:anywhere; word-break:break-word;}
 .pad{padding:var(--sp-4);}
 .action{min-height:var(--touch); display:inline-flex; align-items:center; justify-content:center; gap:var(--sp-2); border-radius:var(--r-md); border:1px solid var(--border); background:var(--raised); color:var(--text); padding:9px var(--sp-4); font-size:var(--fs-base); font-weight:var(--fw-medium); cursor:pointer; transition:border-color var(--dur-1),transform var(--dur-1),background var(--dur-1);}
 .action:hover{border-color:var(--muted);}
@@ -540,7 +540,7 @@ textarea.field{resize:vertical; line-height:var(--lh-loose);}
 .pair-chip{background:var(--surface-3); border:1px solid var(--border); border-radius:var(--r-xs); padding:5px 7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
 /* ---------- ۱۴) آموزش ---------- */
-.lesson{font-size:var(--fs-md); line-height:var(--lh-reading);}
+.lesson{font-size:var(--fs-md); line-height:var(--lh-reading); word-break:break-word; overflow-wrap:anywhere;}
 .lesson p{margin:0;}
 .lesson p + p{margin-top:6px;}
 .lesson .note{margin:6px 0 0; font-size:var(--fs-sm); color:var(--muted);}

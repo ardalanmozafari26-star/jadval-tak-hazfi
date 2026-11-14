@@ -30,7 +30,7 @@ const UI = (() => {
     const dbl = t0 && Engine.isDouble(t0);
     const asn = t0 && Engine.isAsian(t0);
     const rr = t0 && Engine.isRoundRobin(t0);
-    openModal('<h2>ابزارهای جدول (فصل دوم، سوم، چهارم و پنجم)</h2>' +
+    openModal('<h2>ابزارهای جدول</h2>' +
       '<p class="note">نما، چیدمان مجدد، رپشاژ و خروجی‌ها</p>' +
       '<div class="grid2">' +
       '<button class="action" onclick="UI.closeModal();UI.toggleOverview()">◈ نمای کل مسیر</button>' +
@@ -38,7 +38,7 @@ const UI = (() => {
       '<button class="action" onclick="UI.closeModal();UI.openDrawDialog()">🎲 چیدمان مجدد (الف/ب/ج)</button>' +
       ((dbl || asn) ? '' : '<button class="action" onclick="UI.closeModal();UI.openSwapDialog()">🔀 جابه‌جایی سید نزدیک</button>') +
       ((dbl || asn || rr) ? '' : '<button class="action" onclick="UI.closeModal();UI.buildRepechage()">🥉 رپشاژ (شانس مجدد)</button>') +
-      '<button class="action" onclick="UI.closeModal();UI.switchView(\'learn\')">📖 آموزش فصل دوم تا پنجم</button>' +
+      '<button class="action" onclick="UI.closeModal();UI.switchView(\'learn\')">📖 آموزش جداول</button>' +
       '<button class="action" onclick="UI.closeModal();Export.png()">🖼️ عکس مربعی</button>' +
       '<button class="action" onclick="UI.closeModal();Export.print()">🖨️ چاپ / PDF</button></div>' +
       '<div class="modal-btns"><button class="action" onclick="UI.closeModal();Export.csv()">📊 خروجی CSV (با محاسبات و رپشاژ)</button></div>');
@@ -505,7 +505,7 @@ const UI = (() => {
     const byeDisp = (t.settings.byeDisplay || 'higher') === 'higher' ? 'توان بالاتر (با B)' : 'توان کمتر (بدون B)';
     return '<div class="panel pad calc-panel">' +
       '<div class="calc-head">' +
-      '<strong>📐 محاسبات جدول (فصل دوم)</strong>' +
+      '<strong>📐 محاسبات جدول</strong>' +
       '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></div>' +
       '<div class="calc-grid">' +
       '<span>مبنا: ' + Engine.faNum(c.base) + ' (۲ به توان ' + Engine.faNum(c.rounds) + ')</span>' +
@@ -523,7 +523,7 @@ const UI = (() => {
     const byeDisp = (t.settings.byeDisplay || 'higher') === 'higher' ? 'توان بالاتر (با B)' : 'توان کمتر (بدون B)';
     return '<div class="panel pad calc-panel">' +
       '<div class="calc-head">' +
-      '<strong>📐 محاسبات جدول دو حذفی (فصل چهارم)</strong>' +
+      '<strong>📐 محاسبات جدول دو حذفی</strong>' +
       '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></div>' +
       '<div class="calc-grid">' +
       '<span>مبنا: ' + Engine.faNum(c.base) + ' (۲ به توان ' + Engine.faNum(c.rounds) + ')</span>' +
@@ -542,7 +542,7 @@ const UI = (() => {
     const byeDisp = (t.settings.byeDisplay || 'higher') === 'higher' ? 'توان بالاتر (با B)' : 'توان کمتر (بدون B)';
     return '<div class="panel pad calc-panel">' +
       '<div class="calc-head">' +
-      '<strong>📐 محاسبات جدول آسیایی (فصل سوم)</strong>' +
+      '<strong>📐 محاسبات جدول آسیایی</strong>' +
       '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></div>' +
       '<div class="calc-grid">' +
       '<span>مبنا: ' + Engine.faNum(c.base) + ' (۲ به توان ' + Engine.faNum(c.rounds) + ')</span>' +
@@ -552,7 +552,7 @@ const UI = (() => {
       '<span>کل بازی‌ها (رتبه‌بندی کامل): ' + Engine.faNum(c.total) + '</span>' +
       '<span>بازی‌های واقعی (بدون استراحت): ' + Engine.faNum(Engine.statsOverview(t).total) + '</span>' +
       '</div>' +
-      '<div class="calc-note">بازندگان از دور خارج نمی‌شوند؛ هر بازنده فقط برای بهترین مقام همان دور رقابت می‌کند (فصل ۳).</div>' +
+      '<div class="calc-note">بازندگان از دور خارج نمی‌شوند؛ هر بازنده فقط برای بهترین مقام همان دور رقابت می‌کند.</div>' +
       '<div class="calc-note">نمایش استراحت: ' + esc(byeDisp) + (c.byes ? ' • ' + Engine.faNum(c.byes) + ' استراحت (B)' : ' • بدون استراحت') + '</div></div>';
   }
   /* محاسبات و راهنمای جدول دوره‌ای — فصل پنجم */
@@ -561,7 +561,7 @@ const UI = (() => {
     const P = (t.settings && t.settings.points) || { win: 3, draw: 1, loss: 0 };
     return '<div class="panel pad calc-panel">' +
       '<div class="calc-head">' +
-      '<strong>📐 محاسبات جدول دوره‌ای (فصل پنجم)</strong>' +
+      '<strong>📐 محاسبات جدول دوره‌ای</strong>' +
       '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></div>' +
       '<div class="calc-grid">' +
       '<span>تعداد دور: ' + Engine.faNum(c.rounds) + (c.odd ? ' (چون تعداد شرکت‌کنندگان فرد است)' : ' (n−۱)') + '</span>' +
@@ -1278,7 +1278,7 @@ const UI = (() => {
     const isDouble = Engine.isDouble(t);
     const isRound = Engine.isRoundRobin(t);
     const title = isRound ? 'آمار لیگ دوره‌ای 🔄' : isDouble ? 'آمار جدول دوحذفی 🥊' : isAsian ? 'آمار جدول آسیایی 🏯' : 'آمار جدول تک‌حذفی 🏆';
-    const fmtBadge = isRound ? 'فصل ۵ • همه با هم • مساوی مجاز' : isDouble ? 'فصل ۴ • حذف با ۲ باخت' : isAsian ? 'فصل ۳ • رتبه‌بندی کامل' : 'فصل ۲ • یک باخت = حذف';
+    const fmtBadge = isRound ? 'همه با هم • مساوی مجاز' : isDouble ? 'حذف با ۲ باخت' : isAsian ? 'رتبه‌بندی کامل' : 'یک باخت = حذف';
     box.innerHTML =
       '<div class="view-top"><h3 class="block-title m-0">' + title + '</h3><span class="chip static">' + fmtBadge + '</span><button class="action small" onclick="Export.pngStatsSummary()">🖼️ عکس خلاصه</button></div>';
     const paintStats = () => {
@@ -1331,7 +1331,7 @@ const UI = (() => {
       '<h3 class="mini-title accent">۱ • جدول تک‌حذفی چیست؟</h3>' +
       '<p>با یک باخت حذف می‌شوی؛ فرصت جبران نیست. هر بازی مثل فینال هیجان دارد. سریع‌ترین جدول است؛ وقتی شرکت‌کننده زیاد و زمان/امکانات کم است بهترین انتخاب است. عیب: بدشانسی قرعه و حذف زودهنگام قوی‌ها؛ راه‌حل: سیدگذاری + رپشاژ.</p></div>' +
       '<div class="panel pad lesson">' +
-      '<h3 class="mini-title accent">۲ • سه روش چیدمان کتاب</h3>' +
+      '<h3 class="mini-title accent">۲ • سه روش چیدمان</h3>' +
       '<p>الف) <strong>قرعه‌کشی</strong>: بدون توجه به رتبه، بالا→پایین روی جدول خام. فقط وقتی تفاوت سطح مشخص نیست (کشتی/رزمی).<br>' +
       'ب) <strong>سیدگذاری</strong>: S1 قوی‌ترین. S1 بالا، S2 پایین تا فینال زودرس نشود. سپس S4 پایین نیمه بالا و S3 بالای نیمه پایین.<br>' +
       'ج) <strong>ترکیبی</strong>: چند سید اول مشخص + بقیه قرعه. همین برنامه با گزینه «ج) ترکیبی» دقیقاً همین را می‌سازد.</p>' +
@@ -1350,35 +1350,35 @@ const UI = (() => {
       '<p>مبنا: ' + Engine.faNum(c.base) + ' (۲ به توان ' + Engine.faNum(c.rounds) + ') • تعداد دور: ' + Engine.faNum(c.rounds) +
       ' • کل مسابقات: ' + Engine.faNum(c.total) + ' (n−۱) • استراحت: ' + Engine.faNum(c.base) + '−' + Engine.faNum(c.n) + '=' + Engine.faNum(c.byes) +
       ' • مسابقات دور اول: ' + Engine.faNum(c.n) + '−' + Engine.faNum(c.lower) + '=' + Engine.faNum(c.firstMatches) + ' (روش توان کمتر)</p>' +
-      '<p class="note">مثال کتاب: ۲۵ نفر → مبنا ۳۲ (۲⁵) • استراحت ۷=۲۵−۳۲ • دور اول ۹=۱۶−۲۵ • کل ۲۴=۱−۲۵.</p></div>' +
+      '<p class="note">مثال: ۲۵ نفر → مبنا ۳۲ (۲⁵) • استراحت ۷=۲۵−۳۲ • دور اول ۹=۱۶−۲۵ • کل ۲۴=۱−۲۵.</p></div>' +
       '<div class="panel pad lesson">' +
       '<h3 class="mini-title accent">۵ • استراحت B: دو روش</h3>' +
       '<p><strong>توان بالاتر (با B):</strong> استراحت = مبنای بالاتر − n (مثل ۳=۵−۸) به سیدهای ۱،۲،۳… . روی شاخه خالی B بنویس.<br>' +
       '<strong>توان کمتر/پیشرفته (بدون B):</strong> مسابقات دور اول = n − توان کمتر (مثل ۲=۴−۶)؛ خطوط اضافی به برگه اصلی منتقل نمی‌شود. تعداد استراحت/مسابقه در هر دو روش یکی است؛ فقط نمایش فرق می‌کند. وقتی استراحت زیاد است روش توان کمتر تمیزتر است.</p>' +
       '<div class="modal-btns"><button class="action" onclick="UI.switchView(\'bracket\')">دیدن B در جدول</button></div></div>' +
       '<div class="panel pad lesson">' +
-      '<h3 class="mini-title accent">۶ • نکته‌های ظریف کتاب (رعایت‌شده در برنامه)</h3>' +
+      '<h3 class="mini-title accent">۶ • نکته‌های ظریف (رعایت‌شده در برنامه)</h3>' +
       '<p>• در نیمه بالا شاخه‌های بالاتر و در نیمه پایین شاخه‌های پایین‌تر اول پر می‌شوند (قرینه).<br>' +
       '• هم‌باشگاهی/هم‌شهری تا حد ممکن دور اول به هم نخورند؛ جای جفت‌سیدهای نزدیک (۵↔۶ یا ۹↔۱۰) عوض شود.<br>' +
-      '• برد/باخت مثال‌های کتاب فرضی است؛ سرنوشت هر بازی می‌تواند عوض شود.<br>' +
+      '• برد/باخت مثال‌های فرضی است؛ سرنوشت هر بازی می‌تواند عوض شود.<br>' +
       '• ۳۳ تا ۶۴ نفر: مبنای ۶۴، رسم دو نیمه پشت‌به‌هم در یک برگه؛ اگر استراحت زیاد بود روش توان کمتر.</p></div>' +
       '<div class="panel pad lesson">' +
       '<h3 class="mini-title accent">۷ • جدول شانس مجدد / رپشاژ 🥉</h3>' +
       '<p>مخصوص کشتی/رزمی (چیدمان همیشه قرعه). بعد از فینال: بازندگان به قهرمان یک دسته + بازندگان به نایب‌قهرمان یک دسته، هر دسته تک‌حذفی؛ دو نفر برتر «سوم مشترک». در تنیس‌روی‌میز/بدمینتون مرسوم نیست مگر انتخاب تیم برای مرحله بعد مهم باشد؛ اولویت آن‌ها سیدگذاری است.</p>' +
       '<div class="modal-btns"><button class="action primary" onclick="UI.switchView(\'bracket\')">ساخت رپشاژ بعد از فینال</button></div></div>' +
       '<div class="panel pad lesson info">' +
-      '<h3 class="mini-title accent">۸ • جدول دو حذفی (فصل چهارم) ⚔️</h3>' +
+      '<h3 class="mini-title accent">۸ • جدول دو حذفی ⚔️</h3>' +
       '<p><strong>تعریف:</strong> هر شرکت‌کننده فقط با <strong>دو باخت</strong> حذف می‌شود. یک باخت یعنی انتقال به «جدول بازنده‌ها»؛ باخت دوم یعنی حذف. سیدگذاری و استراحت‌گذاری و ادامهٔ مسابقات بین برندگان <strong>دقیقاً مثل جدول تک‌حذفی</strong> است.</p>' +
       '<p><strong>ساختار:</strong> جدول برنده‌ها (WB) + جدول بازنده‌ها (LB) + فینال بزرگ. برندهٔ جدول بازنده‌ها به فینال بزرگ می‌رسد و دوباره با برندهٔ جدول برنده‌ها بازی می‌کند؛ اگر ببرد قهرمان می‌شود.</p>' +
       '<p><strong>قاعدهٔ انتقال بازنده‌ها:</strong> بازندگان <strong>دور اول</strong> و <strong>دور آخر</strong> مستقیم به جدول بازنده‌ها می‌روند؛ بازندگان دور دوم به بعد (بجز دور آخر) <strong>ضربدری</strong> منتقل می‌شوند. اولین ضربدری را «ضربدری کوچک» (دور دوم) و آخرین را «ضربدری بزرگ» می‌گویند. دو روش رسم: <strong>عمودی</strong> (بازنده‌ها پایین جدول) و <strong>افقی</strong> (بازنده‌ها سمت چپ/پشت جدول؛ از وسط برگه شروع کن تا دو طرف جا داشته باشد).</p>' +
       '<p><strong>استراحت B:</strong> مثل تک‌حذفی؛ در روش توان بالاتر خطوط B حذف و به «برگهٔ پاک‌نویس» منتقل می‌شود. بهتر است اول پیش‌نویس رسم شود.</p>' +
       '<p><strong>محاسبات:</strong> کل مسابقات ≈ <strong>۲n−۲</strong> (اگر قهرمان از جدول بازنده‌ها بیاید ۲n−۱). برای ' + Engine.faNum(Math.max(2, n)) + ' نفر: ' +
       (function () { const d = Engine.deCalcInfo(Math.max(2, n)); return Engine.faNum(d.wbMatches) + ' بازی در جدول برنده‌ها + ' + Engine.faNum(d.lbMatches) + ' در جدول بازنده‌ها + ۱ فینال = ' + Engine.faNum(d.total); })() + '.</p>' +
-      '<p class="note">حداکثر ۶۴ نفر (طبق کتاب). چون تعداد مسابقات زیاد است، از جدول تک‌حذفی کامل‌تر ولی از دوره‌ای سبک‌تر است و جزو جداول پرمصرف نیست؛ با افزایش نفرات از جداول ترکیبی استفاده کن.</p>' +
+      '<p class="note">حداکثر ۶۴ نفر. چون تعداد مسابقات زیاد است، از جدول تک‌حذفی کامل‌تر ولی از دوره‌ای سبک‌تر است و جزو جداول پرمصرف نیست؛ با افزایش نفرات از جداول ترکیبی استفاده کن.</p>' +
       '<div class="modal-btns"><button class="action primary" onclick="UI.openTournamentDialog(true)">ویرایش تورنمنت و انتخاب نوع جدول</button></div></div>' +
       /* ---------- فصل سوم کتاب: جدول آسیایی ---------- */
       '<div class="panel pad lesson info">' +
-      '<h3 class="mini-title accent">۹ • جدول آسیایی چیست؟ (فصل سوم) 🌏</h3>' +
+      '<h3 class="mini-title accent">۹ • جدول آسیایی چیست؟ 🌏</h3>' +
       '<p><strong>تعریف:</strong> در جدول یک‌حذفی هر شرکت‌کننده با <strong>اولین باخت</strong> از دور مسابقات حذف می‌گردد و فقط مقام‌های اول و دوم تعیین می‌شوند. در جدول آسیایی، پایه و اساس چیدمان و استراحت‌گذاری شرکت‌کنندگان <strong>دقیقاً همانند جدول یک‌حذفی</strong> است، اما تیم‌ها با باخت از دور مسابقات خارج نمی‌شوند؛ مسابقات تا تعیین مقام کلیهٔ شرکت‌کنندگان ادامه پیدا می‌کند.</p>' +
       '<p>در جدول آسیایی هر شرکت‌کننده با هر باخت، شانس کسب مقام‌های بالاتر را از دست می‌دهد و فقط برای کسب مقام در بین بازندگان تلاش می‌کند. درواقع جدول آسیایی تنها جدولی است که در آن با <strong>کمترین تعداد مسابقه، مقام همهٔ شرکت‌کنندگان</strong> مشخص می‌گردد.</p>' +
       '<p class="note">کاربرد عملی: کشتی، رزمی و رشته‌های انفرادی که لازم است <em>همهٔ</em> شرکت‌کنندگان رتبه داشته باشند. ترکیب تک‌حذفی + پشت‌جدول.</p>' +
@@ -1389,7 +1389,7 @@ const UI = (() => {
       '<p><strong>۲)</strong> در جدول آسیایی هر بازنده در هر دوری که بازنده شود، شانس دستیابی به مقام‌های بالاتر را از دست می‌دهد و فقط برای <strong>کسب بهترین مقام در همان دوری که باخته است</strong> رقابت خواهد کرد.</p>' +
       '<p class="note">یعنی: بازندهٔ فینال → نایب‌قهرمان (رتبه ۲) • بازندگان نیمه‌نهایی → مقام ۳ و ۴ • بازندگان یک‌چهارم → مقام ۵ تا ۸ • بازندگان دور اول → پشت جدول (مقام ۹ به بعد).</p></div>' +
       '<div class="panel pad lesson">' +
-      '<h3 class="mini-title accent">۱۱ • مثال‌های کتاب (فصل سوم)</h3>' +
+      '<h3 class="mini-title accent">۱۱ • مثال‌ها</h3>' +
       '<p><strong>جدول آسیایی ۴ شرکت‌کننده:</strong> دور اول ۲ بازی → فینال (مقام ۱ و ۲) + بازی بازندگان دور اول (مقام ۳ و ۴).</p>' +
       '<p><strong>جدول آسیایی ۸ نفره:</strong> «در جدول آسیایی ۸تایی، برنده‌های دور اول برای مقام‌های <strong>اول تا چهارم</strong> و بازنده‌های دور اول در پشت جدول برای مقام‌های باقیمانده یعنی <strong>پنجم تا هشتم</strong> رقابت می‌کنند.» یعنی ۴ برندهٔ دور اول → نیمه‌نهایی و فینال (مقام ۱ و ۲) + بازی مقام ۳ و ۴؛ و ۴ بازندهٔ دور اول → پشت جدول (مقام ۵ تا ۸).</p>' +
       '<p><strong>جدول آسیایی ۱۱ شرکت‌کننده:</strong> «در جدول آسیایی با ۱۱ شرکت‌کننده، ۸ برندهٔ دور اول برای مقام‌های اول تا هشتم (سمت راست) و ۸ بازندهٔ دور اول برای مقام‌های نهم تا شانزدهم (پشت جدول) مسابقه می‌دهند.» (بدیهی است که تعیین برنده و بازنده در این مثال‌ها فرضی هستند.)</p>' +
@@ -1402,38 +1402,38 @@ const UI = (() => {
       (function () { const a = Engine.asianCalcInfo(Math.max(2, n)); return 'مبنا ' + Engine.faNum(a.base) + ' • دور اول ' + Engine.faNum(a.firstMatches) + ' بازی • جدول جلو ' + Engine.faNum(a.front) + ' تیم • پشت جدول ' + Engine.faNum(a.back) + ' تیم • کل بازی‌ها ' + Engine.faNum(a.total); })() + '.</p>' +
       '<div class="modal-btns"><button class="action" onclick="UI.switchView(\'bracket\')">دیدن جدول آسیایی</button></div></div>' +
       '<div class="panel pad lesson">' +
-      '<h3 class="mini-title accent">۱۳ • نکته‌های کتاب (فصل سوم)</h3>' +
+      '<h3 class="mini-title accent">۱۳ • نکته‌ها</h3>' +
       '<p>• معمولاً از جدول آسیایی برای <strong>حداکثر ۱۱ شرکت‌کننده</strong> استفاده می‌کنند. اگر تعداد شرکت‌کنندگان زیاد باشد بهتر است از جداول دیگری استفاده گردد.<br>' +
       '• ممکن است به تشخیص کمیتهٔ فنی نیازی به تعیین مقام و رتبه برای همهٔ شرکت‌کنندگان نباشد. لذا معمولاً جدول آسیایی را با توجه به اهداف و زمان، <strong>تا هر مقامی که بخواهیم</strong> ادامه می‌دهیم.<br>' +
-      '• تمرین کتاب: جدول آسیایی برای ۹ شرکت‌کننده (به روش توان بالاتر) را کامل کنید و مقام‌های فرضی را مشخص کنید؛ همچنین جدول‌های ۱۲ تا ۱۶ شرکت‌کننده را روی «جدول خام ۱۶تایی» تمرین کنید.</p>' +
+      '• تمرین: جدول آسیایی برای ۹ شرکت‌کننده (به روش توان بالاتر) را کامل کنید و مقام‌های فرضی را مشخص کنید؛ همچنین جدول‌های ۱۲ تا ۱۶ شرکت‌کننده را روی «جدول خام ۱۶تایی» تمرین کنید.</p>' +
       '<div class="modal-btns"><button class="action primary" onclick="UI.openTournamentDialog(true)">ساخت جدول آسیایی با برنامه</button></div></div>' +
       /* ---------- فصل پنجم کتاب: جدول دوره‌ای ---------- */
       '<div class="panel pad lesson info">' +
-      '<h3 class="mini-title accent">۱۴ • جدول دوره‌ای چیست؟ (فصل پنجم) 🔄</h3>' +
+      '<h3 class="mini-title accent">۱۴ • جدول دوره‌ای چیست؟ 🔄</h3>' +
       '<p><strong>تعریف:</strong> جدول دوره‌ای جدولی است که <strong>همهٔ شرکت‌کنندگان در یک گروه با همدیگر بازی می‌کنند</strong>. در جداول حذفی (یک‌حذفی، دو‌حذفی، آسیایی) ضروری بود که نتیجهٔ برد و باخت هر بازی با برد یکی و باخت دیگری مشخص گردد، اما در جدول دوره‌ای <strong>ممکن است نتیجهٔ بازی به تساوی کشیده شود</strong>. لذا برای جدول دوره‌ای در هر رشتهٔ ورزشی برای برد، باخت و تساوی امتیازات خاصی در نظر گرفته شده و با توجه به جمع امتیازات کسب‌شده، مقام هر شرکت‌کننده در گروه مشخص می‌گردد.</p>' +
       '<p>می‌دانیم زمان، امکانات و تجهیزات و حتی شرایط مسابقه در هر رشته متفاوت است؛ بنابراین کمیتهٔ فنی در هر رشته تصمیم می‌گیرد که کل شرکت‌کنندگان در <strong>یک یا چند گروه</strong> تقسیم شوند.</p>' +
       '<p><strong>محاسبات:</strong> هر تیم در گروه خودش <strong>(n−۱) مسابقه</strong> می‌دهد و تعداد کل مسابقات گروه از فرمول <strong>n(n−۱)÷۲</strong> به دست می‌آید؛ یعنی برای ۵ شرکت‌کننده باید ۱۰ مسابقه انجام گیرد.</p>' +
-      '<p class="note">سؤال کتاب: اگر ۸ شرکت‌کننده در مسابقه انفرادی تنیس روی میز در یک گروه با هم مسابقه بدهند، هر تیم ۷ مسابقه و کل ۲۸ مسابقه خواهد داشت؛ اما اگر به‌جای آن ۸ تیم هندبال در یک گروه بازی کنند، به چه مشکلاتی می‌خوریم؟ (زمان و امکانات!)</p></div>' +
+      '<p class="note">سؤال: اگر ۸ شرکت‌کننده در مسابقه انفرادی تنیس روی میز در یک گروه با هم مسابقه بدهند، هر تیم ۷ مسابقه و کل ۲۸ مسابقه خواهد داشت؛ اما اگر به‌جای آن ۸ تیم هندبال در یک گروه بازی کنند، به چه مشکلاتی می‌خوریم؟ (زمان و امکانات!)</p></div>' +
       '<div class="panel pad lesson">' +
       '<h3 class="mini-title accent">۱۵ • نکتهٔ گروه‌بندی</h3>' +
-      '<p>چنانچه تعداد تیم‌ها یا نفرات شرکت‌کننده زیاد باشند، برای اینکه تعداد مسابقات خیلی زیاد نشود، بهتر است شرکت‌کنندگان در <strong>بیش از یک گروه</strong> تقسیم‌بندی شوند؛ در این حالت از <strong>جداول ترکیبی</strong> برای مشخص کردن نتایج نهایی استفاده می‌گردد (فصل بعد).</p></div>' +
+      '<p>چنانچه تعداد تیم‌ها یا نفرات شرکت‌کننده زیاد باشند، برای اینکه تعداد مسابقات خیلی زیاد نشود، بهتر است شرکت‌کنندگان در <strong>بیش از یک گروه</strong> تقسیم‌بندی شوند؛ در این حالت از <strong>جداول ترکیبی</strong> برای مشخص کردن نتایج نهایی استفاده می‌گردد .</p></div>' +
       '<div class="panel pad lesson">' +
       '<h3 class="mini-title accent">۱۶ • رسم جدول دور بازی‌ها</h3>' +
       '<p><strong>۱)</strong> تیم‌ها را بر اساس <strong>سیدگذاری یا قرعه‌کشی</strong> به ترتیب در یک <strong>ستون</strong> می‌نویسیم.</p>' +
       '<p><strong>۲)</strong> برای رسم دور اول، شرکت‌کنندگان را به شکل <strong>مقابل همدیگر</strong> قرار می‌دهیم؛ یعنی نصف آنها در سمت چپ و نصف بعدی روبه‌روی آنها (جفت‌های قرینه).</p>' +
       '<p><strong>۳)</strong> برای رسم دور دوم، <strong>«۱» ثابت</strong> می‌ماند و بقیه <strong>یک دنده مخالف عقربه‌های ساعت</strong> جابه‌جا می‌شوند؛ برای دورهای بعدی نیز به همین‌طور عمل می‌شود.</p>' +
-      '<p class="note">مثال کتاب (۶ شرکت‌کننده): دور۱ = ۱−۶، ۲−۵، ۳−۴ • دور۲ = ۱−۵، ۴−۶، ۲−۳ • دور۳ = ۱−۴، ۳−۵، ۲−۶ • دور۴ = ۱−۳، ۲−۴، ۵−۶ • دور۵ = ۱−۲، ۳−۶، ۴−۵ — یعنی ۵ دور برای ۶ شرکت‌کننده (n−۱).</p>' +
-      '<p class="note">برنامه دقیقاً همین روش کتابی را پیاده کرده است: در «جدول» برای هر دور، جفت‌ها را می‌بینید.</p></div>' +
+      '<p class="note">مثال (۶ شرکت‌کننده): دور۱ = ۱−۶، ۲−۵، ۳−۴ • دور۲ = ۱−۵، ۴−۶، ۲−۳ • دور۳ = ۱−۴، ۳−۵، ۲−۶ • دور۴ = ۱−۳، ۲−۴، ۵−۶ • دور۵ = ۱−۲، ۳−۶، ۴−۵ — یعنی ۵ دور برای ۶ شرکت‌کننده (n−۱).</p>' +
+      '<p class="note">برنامه دقیقاً همین روش را پیاده کرده است: در «جدول» برای هر دور، جفت‌ها را می‌بینید.</p></div>' +
       '<div class="panel pad lesson">' +
       '<h3 class="mini-title accent">۱۷ • حالت فرد: استراحت (B)</h3>' +
       '<p>اگر تعداد شرکت‌کنندگان <strong>زوج</strong> باشد، دو به دو با هم بازی می‌کنند و نیازی به استراحت‌گذاری نیست. اما اگر <strong>فرد</strong> باشد، باید در هر دور یکی از شرکت‌کنندگان استراحت نماید.</p>' +
-      '<p>روش کتاب: ابتدا شرکت‌کنندگان را برحسب سیدگذاری یا قرعه‌کشی در یک ستون زیر هم می‌نویسیم و <strong>در انتها حرف B را به ستون اضافه می‌کنیم</strong>؛ سپس همانند توضیحات قبلی دورهای مسابقات رسم می‌گردد. در این حالت نیز همواره «۱» ثابت و سایر شرکت‌کنندگان هر دور یک دنده جابه‌جا می‌شوند.</p>' +
+      '<p>روش کار: ابتدا شرکت‌کنندگان را برحسب سیدگذاری یا قرعه‌کشی در یک ستون زیر هم می‌نویسیم و <strong>در انتها حرف B را به ستون اضافه می‌کنیم</strong>؛ سپس همانند توضیحات قبلی دورهای مسابقات رسم می‌گردد. در این حالت نیز همواره «۱» ثابت و سایر شرکت‌کنندگان هر دور یک دنده جابه‌جا می‌شوند.</p>' +
       '<p>چون تیمی که B دارد عملاً بازی انجام نمی‌دهد، لذا <strong>تعداد دورها در حالت فرد برابر با n</strong> (تعداد شرکت‌کنندگان) است؛ در حالی که در حالت زوج n−۱ دور داریم. تعداد کل مسابقات در هر دو حالت یکسان است.</p>' +
-      '<p class="note">مثال کتاب (۳ شرکت‌کننده): دور۱ = ۱−B و ۲−۳ • دور۲ = ۱−۳ و B−۲ • دور۳ = ۱−۲ و ۳−B</p></div>' +
+      '<p class="note">مثال (۳ شرکت‌کننده): دور۱ = ۱−B و ۲−۳ • دور۲ = ۱−۳ و B−۲ • دور۳ = ۱−۲ و ۳−B</p></div>' +
       '<div class="panel pad lesson">' +
       '<h3 class="mini-title accent">۱۸ • جدول ثبت نتایج گروه</h3>' +
       '<p>در جداول حذفی نتیجه با برد یا باخت رقم می‌خورد و معمولاً در جدول ثبت نمی‌شود؛ اما در جدول دوره‌ای چون <strong>مجموع امتیازات و گاهی تفاضل نتایج</strong> مقام هر شرکت‌کننده را مشخص می‌کند، باید برای هر گروه جدولی به نام <strong>«جدول ثبت نتایج»</strong> طراحی شود.</p>' +
-      '<p><strong>مراحل طراحی (کتاب):</strong></p>' +
+      '<p><strong>مراحل طراحی:</strong></p>' +
       '<p>۱) به تعداد حداکثر ردیف و حداقل ستون جدول را رسم می‌کنیم.<br>' +
       '۲) خانه‌های قطری جدول را از سمت راست به چپ هاشور یا رنگ می‌زنیم (نیازی به این خانه‌ها نداریم).<br>' +
       '۳) در اولین خانهٔ هر ردیف نام شرکت‌کنندگان را می‌نویسیم.<br>' +
@@ -1446,17 +1446,17 @@ const UI = (() => {
       '<h3 class="mini-title accent">۱۹ • نکتهٔ مهم: مسابقات رفت و برگشت</h3>' +
       '<p>در مسابقات لیگ که به‌صورت <strong>رفت و برگشت (دو دوره‌ای)</strong> برگزار می‌شوند، نتایج دور رفت در خانه‌های <strong>بالای هاشور</strong> و نتایج برگشت در خانه‌های <strong>زیر هاشور</strong> ثبت می‌شوند.</p></div>' +
       '<div class="panel pad lesson">' +
-      '<h3 class="mini-title accent">۲۰ • تمرین‌های فصل پنجم</h3>' +
-      '<p>• تمرین کتاب: اگر ۴ تیم فوتبال به‌صورت دوره‌ای در یک گروه با هم مسابقه دهند، جدول دور مسابقات را کامل کنید.<br>' +
-      '• تمرین کتاب: ۵ شرکت‌کنندهٔ بدمینتون → محاسبهٔ تعداد دورها و تعداد کل مسابقات، تکمیل جدول دورها و جدول ثبت نتایج.<br>' +
-      '• تمرین کتاب: ۷ تیم والیبال → سیدگذاری تیم‌ها، محاسبهٔ تعداد دورها (۷) و کل مسابقات (۲۱)، رسم جدول دورهای مسابقات و تکمیل جدول ثبت نتایج.<br>' +
+      '<h3 class="mini-title accent">۲۰ • تمرین‌ها</h3>' +
+      '<p>• تمرین: اگر ۴ تیم فوتبال به‌صورت دوره‌ای در یک گروه با هم مسابقه دهند، جدول دور مسابقات را کامل کنید.<br>' +
+      '• تمرین: ۵ شرکت‌کنندهٔ بدمینتون → محاسبهٔ تعداد دورها و تعداد کل مسابقات، تکمیل جدول دورها و جدول ثبت نتایج.<br>' +
+      '• تمرین: ۷ تیم والیبال → سیدگذاری تیم‌ها، محاسبهٔ تعداد دورها (۷) و کل مسابقات (۲۱)، رسم جدول دورهای مسابقات و تکمیل جدول ثبت نتایج.<br>' +
       '• مقایسه کنید: معایب و محاسن جدول یک‌حذفی و دوره‌ای چیست؟ آیا حساسیت قرعه‌کشی در جدول دوره‌ای مثل جدول یک‌حذفی است؟</p>' +
       '<div class="modal-btns"><button class="action primary" onclick="UI.openTournamentDialog(true)">ساخت جدول دوره‌ای با برنامه</button></div></div>';
     // تبدیل فصل‌ها به آکاردئون + فهرست
     const lessons = Array.from(box.querySelectorAll('.lesson'));
     const accs = lessons.map((p, i) => {
       const h = p.querySelector('h3');
-      const raw = h ? h.textContent : ('فصل ' + Engine.faNum(i + 1));
+      const raw = h ? h.textContent : ('بخش ' + Engine.faNum(i + 1));
       const title = raw.replace(/^[۰-۹0-9]+\s*[•\-–—]\s*/, '').trim();
       if (h) h.remove();
       const info = p.classList.contains('info');
@@ -1474,7 +1474,7 @@ const UI = (() => {
     accs.forEach(a => box.appendChild(a.acc));
     const toc = $('learnToc');
     if (toc) {
-      toc.innerHTML = accs.map((a, i) => '<a href="#acc' + (i + 1) + '" onclick="UI.jumpAcc(' + (i + 1) + ')">فصل ' + Engine.faNum(i + 1) + ' • ' + esc(a.title) + '</a>').join('');
+      toc.innerHTML = accs.map((a, i) => '<a href="#acc' + (i + 1) + '" onclick="UI.jumpAcc(' + (i + 1) + ')">بخش ' + Engine.faNum(i + 1) + ' • ' + esc(a.title) + '</a>').join('');
     }
   }
   function toggleAcc(head) {
@@ -1538,7 +1538,7 @@ const UI = (() => {
           '<br><span class="muted">امتیاز: برد ' + Engine.faNum(P.win || 0) + ' • مساوی ' + Engine.faNum(P.draw || 0) + ' • باخت ' + Engine.faNum(P.loss || 0) + ' • روش چیدمان: ' + esc(drawMethodFa(t)) + '</span>';
       } else {
         const c = Engine.calcInfo(Math.max(2, t.teams.length));
-        cb.innerHTML = '<strong>📐 محاسبات کتابی (' + Engine.faNum(t.teams.length) + ' شرکت‌کننده)</strong><br>' +
+        cb.innerHTML = '<strong>📐 محاسبات (' + Engine.faNum(t.teams.length) + ' شرکت‌کننده)</strong><br>' +
           'مبنا: ' + Engine.faNum(c.base) + ' (۲ به توان ' + Engine.faNum(c.rounds) + ') • دور: ' + Engine.faNum(c.rounds) +
       ' • کل: ' + Engine.faNum(c.total) + ' (n−۱) • استراحت: ' + Engine.faNum(c.byes) +
       ' • دور اول روی کاغذ: ' + Engine.faNum(c.drawnMatches) + ' (واقعی ' + Engine.faNum(c.realFirst) + ') • جمع جفت‌سید: ' + Engine.faNum(c.sum) +
@@ -1737,10 +1737,10 @@ const UI = (() => {
       dlg('رشته ورزشی', '<select id="f_sport" class="field">' +
       Object.keys(SPORTS).map(k => '<option value="' + k + '"' + (t && t.sport === k ? ' selected' : '') + '>' + SPORTS[k] + '</option>').join('') + '</select>') +
       dlg('نوع جدول', '<select id="f_format" class="field"' + (t && t.rounds.length ? ' disabled' : '') + '>' +
-      '<option value="single"' + (!t || (t.format !== 'double' && t.format !== 'asian' && t.format !== 'round') ? ' selected' : '') + '>تک‌حذفی (فصل ۲)</option>' +
-      '<option value="asian"' + (t && t.format === 'asian' ? ' selected' : '') + '>آسیایی (فصل ۳) — تا ۱۱ تیم</option>' +
-      '<option value="double"' + (t && t.format === 'double' ? ' selected' : '') + '>دو‌حذفی (فصل ۴)</option>' +
-      '<option value="round"' + (t && t.format === 'round' ? ' selected' : '') + '>دوره‌ای (فصل ۵) — همه با هم</option></select>') +
+      '<option value="single"' + (!t || (t.format !== 'double' && t.format !== 'asian' && t.format !== 'round') ? ' selected' : '') + '>تک‌حذفی</option>' +
+      '<option value="asian"' + (t && t.format === 'asian' ? ' selected' : '') + '>آسیایی — تا ۱۱ تیم</option>' +
+      '<option value="double"' + (t && t.format === 'double' ? ' selected' : '') + '>دو‌حذفی</option>' +
+      '<option value="round"' + (t && t.format === 'round' ? ' selected' : '') + '>دوره‌ای — همه با هم</option></select>') +
       dlg('ظرفیت جدول', '<select id="f_size" class="field">' +
       [4, 8, 16, 32, 64].map(n => '<option value="' + n + '"' + (t && t.targetSize === n ? ' selected' : '') + '>' + n + ' تیم</option>').join('') + '</select>') +
       dlg('تاریخ شروع', '<input type="date" id="f_start" class="field" value="' + (t ? (t.startDate || '') : '') + '">') +
@@ -1831,7 +1831,7 @@ const UI = (() => {
   let drawMethod = 'lottery', manualOrder = [], drawSeeded = 4;
   const DRAW_METHODS = {
     lottery: 'الف) قرعه‌کشی (شانسی)',
-    seeding: 'ب) سیدگذاری (هدفمند کتابی)',
+    seeding: 'ب) سیدگذاری (هدفمند)',
     combined: 'ج) ترکیبی (سید + قرعه)'
   };
   function openDrawDialog() {
@@ -1854,13 +1854,13 @@ const UI = (() => {
         : (info.byes ? '<br><small class="muted">' + Engine.faNum(info.byes) + ' استراحت (B) • ' + Engine.faNum(info.rounds) + ' دور • ' + Engine.faNum(info.total) + ' مسابقه</small>' : '<br><small class="muted">بدون استراحت • ' + Engine.faNum(info.rounds) + ' دور</small>')) + '</h2>' +
       '<div class="panel pad calc-panel">' +
       (dbl
-        ? '📐 محاسبات فصل چهارم: جدول برنده‌ها ' + Engine.faNum(info.wbMatches) + ' بازی • جدول بازنده‌ها ' + Engine.faNum(info.lbMatches) + ' بازی • فینال بزرگ ۱ • کل ' + Engine.faNum(info.total) + ' (۲n−۲)'
+        ? '📐 محاسبات: جدول برنده‌ها ' + Engine.faNum(info.wbMatches) + ' بازی • جدول بازنده‌ها ' + Engine.faNum(info.lbMatches) + ' بازی • فینال بزرگ ۱ • کل ' + Engine.faNum(info.total) + ' (۲n−۲)'
         : asn
-          ? '📐 محاسبات فصل سوم: دور اول ' + Engine.faNum(info.firstMatches) + ' بازی • جدول جلو (مقام ۱ تا ' + Engine.faNum(info.front) + '): ' + Engine.faNum(info.front) + ' تیم • پشت جدول (مقام ' + Engine.faNum(info.front + 1) + ' تا ' + Engine.faNum(info.base) + '): ' + Engine.faNum(info.back) + ' تیم • کل بازی‌ها ' + Engine.faNum(info.total)
+          ? '📐 محاسبات: دور اول ' + Engine.faNum(info.firstMatches) + ' بازی • جدول جلو (مقام ۱ تا ' + Engine.faNum(info.front) + '): ' + Engine.faNum(info.front) + ' تیم • پشت جدول (مقام ' + Engine.faNum(info.front + 1) + ' تا ' + Engine.faNum(info.base) + '): ' + Engine.faNum(info.back) + ' تیم • کل بازی‌ها ' + Engine.faNum(info.total)
           : rr
-            ? '📐 محاسبات فصل پنجم: هر تیم ' + Engine.faNum(info.perTeam) + ' بازی (n−۱) • ' + Engine.faNum(info.rounds) + ' دور • کل مسابقات ' + Engine.faNum(info.total) + ' (n(n−۱)÷۲) • نتیجه می‌تواند مساوی باشد'
-            : '📐 محاسبات کتابی: مبنا ' + Engine.faNum(info.base) + ' (' + '۲ به توان ' + Engine.faNum(info.rounds) + ') • جمع جفت‌سید ' + Engine.faNum(info.sum) + ' • مسابقات دور اول ' + Engine.faNum(info.firstMatches)) + '</div>' +
-      dlg('روش چیدمان (فصل دوم کتاب)', '<select id="draw_method" class="field" onchange="UI.drawPreview()">' +
+            ? '📐 محاسبات: هر تیم ' + Engine.faNum(info.perTeam) + ' بازی (n−۱) • ' + Engine.faNum(info.rounds) + ' دور • کل مسابقات ' + Engine.faNum(info.total) + ' (n(n−۱)÷۲) • نتیجه می‌تواند مساوی باشد'
+            : '📐 محاسبات: مبنا ' + Engine.faNum(info.base) + ' (' + '۲ به توان ' + Engine.faNum(info.rounds) + ') • جمع جفت‌سید ' + Engine.faNum(info.sum) + ' • مسابقات دور اول ' + Engine.faNum(info.firstMatches)) + '</div>' +
+      dlg('روش چیدمان', '<select id="draw_method" class="field" onchange="UI.drawPreview()">' +
       '<option value="lottery"' + (drawMethod === 'lottery' ? ' selected' : '') + '>الف) قرعه‌کشی — بدون توجه به رتبه</option>' +
       '<option value="seeding"' + (drawMethod === 'seeding' ? ' selected' : '') + '>ب) سیدگذاری — ۱ قوی‌ترین، جمع‌ها ' + Engine.faNum(info.sum) + '</option>' +
       '<option value="combined"' + (drawMethod === 'combined' ? ' selected' : '') + '>ج) ترکیبی — چند سید اول + بقیه قرعه</option>' +
@@ -1871,11 +1871,11 @@ const UI = (() => {
       '<option value="higher"' + ((t.settings.byeDisplay || 'higher') === 'higher' ? ' selected' : '') + '>روش توان بالاتر — با نوشتن B</option>' +
       '<option value="lower"' + (t.settings.byeDisplay === 'lower' ? ' selected' : '') + '>روش توان کمتر/پیشرفته — بدون B (فشرده)</option></select>') +
       dlg('قرعه استراحت به', '<select id="draw_bye" class="field">' +
-      '<option value="top"' + ((t.settings.byeTo || 'top') === 'top' ? ' selected' : '') + '>سیدهای بالا (کتابی)</option>' +
+      '<option value="top"' + ((t.settings.byeTo || 'top') === 'top' ? ' selected' : '') + '>سیدهای بالا</option>' +
       '<option value="random"' + (t.settings.byeTo === 'random' ? ' selected' : '') + '>تصادفی</option></select>') +
       '<div id="drawPreview" class="seed-list"></div>' +
-      '<p class="hint-note">⚖️ نکته کتابی: هم‌باشگاهی/هم‌شهری‌ها در دور اول حریف هم نشوند؛ در صورت نیاز جای دو سید نزدیک (مثل ۵↔۶ یا ۹↔۱۰) را بعداً جابه‌جا کن. سید ۱ بالا و سید ۲ پایین جدول می‌نشیند تا فینال زودرس نشود.</p>' +
-      '<div class="modal-btns"><button class="action primary" onclick="UI.doDraw()">تأیید و ساخت جدول کتابی</button>' +
+      '<p class="hint-note">⚖️ نکته: هم‌باشگاهی/هم‌شهری‌ها در دور اول حریف هم نشوند؛ در صورت نیاز جای دو سید نزدیک (مثل ۵↔۶ یا ۹↔۱۰) را بعداً جابه‌جا کن. سید ۱ بالا و سید ۲ پایین جدول می‌نشیند تا فینال زودرس نشود.</p>' +
+      '<div class="modal-btns"><button class="action primary" onclick="UI.doDraw()">تأیید و ساخت جدول</button>' +
       '<button class="action" onclick="UI.closeModal()">انصراف</button></div>' +
       (t.rounds.length ? '<button class="action small u-mt-2 u-w-full" onclick="UI.openSwapDialog()">🔀 جابه‌جایی دو سید نزدیک (بدون قرعه مجدد)</button>' : ''));
     drawPreview();
@@ -1908,7 +1908,7 @@ const UI = (() => {
     } catch (e) {}
     $('drawPreview').innerHTML = pairsHtml +
       '<p class="pairs-title">' +
-      (drawMethod === 'lottery' ? 'ترتیب قرعه (تصادفی، بالا→پایین روی جدول خام):' : drawMethod === 'seeding' ? 'ترتیب سیدها (S1 قوی‌ترین، بالا→پایین):' : drawMethod === 'combined' ? Engine.faNum(drawSeeded) + ' سید اول سر جای کتابی، بقیه قرعه:' : 'ترتیب دستی:') + '</p>' +
+      (drawMethod === 'lottery' ? 'ترتیب قرعه (تصادفی، بالا→پایین روی جدول خام):' : drawMethod === 'seeding' ? 'ترتیب سیدها (S1 قوی‌ترین، بالا→پایین):' : drawMethod === 'combined' ? Engine.faNum(drawSeeded) + ' سید اول سر جای خود، بقیه قرعه:' : 'ترتیب دستی:') + '</p>' +
       arr.map((tm, i) =>
       '<div class="seed-item"><span class="pos">S' + Engine.faNum(tm.rank || (i + 1)) + '</span><span class="nm">' + esc(tm.name) + '</span>' +
       (drawMethod === 'manual' ? '<button class="mini" onclick="UI.manualMove(' + i + ',-1)">▲</button><button class="mini" onclick="UI.manualMove(' + i + ',1)">▼</button>' : '') +
@@ -1940,7 +1940,7 @@ const UI = (() => {
   function openSwapDialog() {
     const t = Store.active(); if (!t || !t.rounds.length) return;
     const opts = t.teams.map(tm => '<option value="' + tm.id + '">' + esc(tm.name) + ' (سید ' + Engine.faNum(tm.rank || '—') + ')</option>').join('');
-    openModal('<h2>جابه‌جایی دو سید نزدیک</h2><p class="note-block">نکته کتابی: هم‌باشگاهی/هم‌شهری‌ها دور اول به هم نخورند؛ جای جفت‌سیدهای نزدیک (مثل ۵↔۶ یا ۹↔۱۰) را عوض کن. نتایج ثبت‌شده پاک می‌شود.</p>' +
+    openModal('<h2>جابه‌جایی دو سید نزدیک</h2><p class="note-block">نکته: هم‌باشگاهی/هم‌شهری‌ها دور اول به هم نخورند؛ جای جفت‌سیدهای نزدیک (مثل ۵↔۶ یا ۹↔۱۰) را عوض کن. نتایج ثبت‌شده پاک می‌شود.</p>' +
       dlg('سید اول', '<select id="sw_a" class="field">' + opts + '</select>') +
       dlg('سید دوم', '<select id="sw_b" class="field">' + opts + '</select>') +
       '<div class="modal-btns"><button class="action primary" onclick="UI.doSwap()">جابجا کن</button>' +

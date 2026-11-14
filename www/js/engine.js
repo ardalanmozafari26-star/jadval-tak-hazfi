@@ -287,7 +287,7 @@ const Engine = (() => {
     const ordered = orderTeams(t, m === 'seeding' || m === 'combined' ? 'seeding' : m);
     const n = ordered.length;
     if (n < 2) { alert('برای شروع، حداقل ۲ شرکت‌کننده لازم است 🌱'); return false; }
-    if (n > DE_MAX) { alert('طبق فصل چهارم، حداکثر ۶۴ شرکت‌کننده برای جدول دو حذفی.'); return false; }
+    if (n > DE_MAX) { alert('حداکثر ۶۴ شرکت‌کننده برای جدول دو حذفی.'); return false; }
     const slots = nextPow2(n);
     const k = Math.log2(slots);
     const ids = ordered.map(x => x.id);
@@ -991,7 +991,7 @@ const Engine = (() => {
     const ordered = orderTeams(t, m === 'seeding' || m === 'combined' ? 'seeding' : m);
     const n = ordered.length;
     if (n < 2) { alert('برای شروع، حداقل ۲ شرکت‌کننده لازم است 🌱'); return false; }
-    if (n > ASIAN_MAX) { alert('طبق فصل سوم کتاب، جدول آسیایی معمولاً برای حداکثر ۱۱ شرکت‌کننده به کار می‌رود.'); return false; }
+    if (n > ASIAN_MAX) { alert('جدول آسیایی معمولاً برای حداکثر ۱۱ شرکت‌کننده به کار می‌رود.'); return false; }
     const slots = nextPow2(n);
     const ids = ordered.map(x => x.id);
     let slotArr;

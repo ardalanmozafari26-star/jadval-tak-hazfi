@@ -35,7 +35,8 @@ const Export = (() => {
       accent: dark ? '#c4f35b' : '#65a30d', gold: '#ca8a04'
     };
   }
-  const cut = (s, n) => { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n) + '…' : s; };
+  const cut = (s, n) => { s = String(s == null ? '' : s); if (s.length <= n) return s; let out = s.slice(0, n); // حذف نیم‌فاصلهٔ آویزان برای جلوگیری از به‌هم‌ریختگی حروف
+  while (out.length && out.charCodeAt(out.length - 1) === 0x200C) out = out.slice(0, -1); return out + '…'; };
   const fa = n => { try { return Engine.faNum(n); } catch (e) { return String(n); } };
   const safeName = s => String(s || 'tournament').replace(/[\/\\?%*:|"<>]/g, '-').trim().slice(0, 60) || 'tournament';
   const stamp = () => { try { return new Date().toISOString().slice(0, 10); } catch (e) { return 'img'; } };
@@ -60,12 +61,12 @@ const Export = (() => {
   function drawHeader(c, P, title, sub, fmt) {
     const W = SQ;
     c.textAlign = 'right';
-    c.fillStyle = P.text; c.font = 'bold 36px Tahoma';
+    c.fillStyle = P.text; c.font = 'bold 36px Tahoma, "Noto Sans Arabic", sans-serif';
     c.fillText(cut(title, 30), W - PAD, 78);
-    c.fillStyle = P.muted; c.font = '19px Tahoma';
+    c.fillStyle = P.muted; c.font = '19px Tahoma, "Noto Sans Arabic", sans-serif';
     c.fillText(cut(sub, 58), W - PAD, 116);
     c.textAlign = 'left';
-    c.fillStyle = P.accent; c.font = 'bold 21px Tahoma';
+    c.fillStyle = P.accent; c.font = 'bold 21px Tahoma, "Noto Sans Arabic", sans-serif';
     c.fillText(fmt, PAD, 78);
     // خط جداکننده مینیمال
     c.strokeStyle = P.line; c.lineWidth = 2;
@@ -77,7 +78,7 @@ const Export = (() => {
     c.beginPath(); c.moveTo(PAD, SQ - FOOTER_H + 18); c.lineTo(W - PAD, SQ - FOOTER_H + 18); c.stroke();
     let dateStr = '';
     try { dateStr = new Date().toLocaleDateString('fa-IR'); } catch (e) {}
-    c.textAlign = 'center'; c.fillStyle = P.muted; c.font = '16px Tahoma';
+    c.textAlign = 'center'; c.fillStyle = P.muted; c.font = '16px Tahoma, "Noto Sans Arabic", sans-serif';
     c.fillText('ساخته‌شده با جدول تک‌حذفی' + (dateStr ? ' • ' + dateStr : ''), W / 2, SQ - 34);
   }
 
@@ -128,7 +129,7 @@ const Export = (() => {
     let y = HEADER_H;
     (pageSecs || []).forEach(s => {
       if (s.head) {
-        c.textAlign = 'right'; c.fillStyle = P.accent; c.font = 'bold 22px Tahoma';
+        c.textAlign = 'right'; c.fillStyle = P.accent; c.font = 'bold 22px Tahoma, "Noto Sans Arabic", sans-serif';
         c.fillText(cut(s.head, 40), SQ - PAD, y + 6);
         y += SEC_HEAD_H;
       }
@@ -138,16 +139,16 @@ const Export = (() => {
         roundRect(c, x, y, w, ROW_H, 18); c.fill();
         c.strokeStyle = P.line; c.lineWidth = 1.5;
         roundRect(c, x, y, w, ROW_H, 18); c.stroke();
-        c.textAlign = 'right'; c.fillStyle = P.text; c.font = 'bold 19px Tahoma';
+        c.textAlign = 'right'; c.fillStyle = P.text; c.font = 'bold 19px Tahoma, "Noto Sans Arabic", sans-serif';
         if (r.sub) {
           c.fillText(cut(r.main, 32), SQ - PAD - 18, y + 36);
-          c.fillStyle = P.muted; c.font = '15px Tahoma';
+          c.fillStyle = P.muted; c.font = '15px Tahoma, "Noto Sans Arabic", sans-serif';
           c.fillText(cut(r.sub, 52), SQ - PAD - 18, y + 64);
         } else {
           c.fillText(cut(r.main, 34), SQ - PAD - 18, y + 55);
         }
         if (r.badge !== undefined && r.badge !== '' && r.badge !== null) {
-          c.textAlign = 'left'; c.fillStyle = P.accent; c.font = 'bold 19px Tahoma';
+          c.textAlign = 'left'; c.fillStyle = P.accent; c.font = 'bold 19px Tahoma, "Noto Sans Arabic", sans-serif';
           c.fillText(cut(r.badge, 16), PAD + 18, y + 55);
         }
         y += ROW_H + ROW_GAP;
@@ -155,7 +156,7 @@ const Export = (() => {
       y += 6;
     });
     drawFooter(c, P);
-    webDownload(cv.toDataURL('image/png'), filename);
+    pngDownload(cv.toDataURL('image/png'), filename);
   }
 
   /* sections: [{head, rows:[{main, sub, badge}]}] — چندصفحه‌ای مربعی */
@@ -171,7 +172,24 @@ const Export = (() => {
     });
   }
 
-  /* ---------- دانلود مستقیم (بدون منوی اشتراک) ---------- */
+  /* ---------- دانلود/ذخیره عکس مربعی (روی اندروید هم کار می‌کند) ---------- */
+  function pngDownload(dataUrl, filename) {
+    const P = capPlugins();
+    if (P && P.Filesystem && P.Share) {
+      const base64 = String(dataUrl).split(',')[1] || '';
+      P.Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' })
+        .then(() => P.Filesystem.getUri({ path: filename, directory: 'CACHE' }))
+        .then(uri => P.Share.share({ title: filename, files: [uri.uri], dialogTitle: 'ذخیرهٔ عکس' }))
+        .catch(() => {
+          // تلاش برای ذخیرهٔ مستقیم در پوشهٔ دانلود
+          P.Filesystem.writeFile({ path: filename, data: base64, directory: 'DOWNLOAD' })
+            .then(() => { try { alert('عکس در پوشهٔ دانلود ذخیره شد.'); } catch (e) {} })
+            .catch(() => webDownload(dataUrl, filename));
+        });
+      return;
+    }
+    webDownload(dataUrl, filename);
+  }
   function webDownload(dataUrl, filename) {
     try {
       const a = document.createElement('a');
@@ -182,7 +200,7 @@ const Export = (() => {
       a.remove();
     } catch (e) { alert('ذخیره عکس ممکن نشد.'); }
   }
-  function shareOrDownload(dataUrl, filename) { webDownload(dataUrl, filename); }
+  function shareOrDownload(dataUrl, filename) { pngDownload(dataUrl, filename); }
   function dataURLtoBlob(url) {
     const parts = url.split(',');
     const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/png';
@@ -297,7 +315,7 @@ const Export = (() => {
     };
     stages.forEach((rd, r) => {
       const x = PAD + r * (colW + gap);
-      c.fillStyle = P.accent; c.font = 'bold 17px Tahoma'; c.textAlign = 'center';
+      c.fillStyle = P.accent; c.font = 'bold 17px Tahoma, "Noto Sans Arabic", sans-serif'; c.textAlign = 'center';
       c.fillText(cut(rd.title, 20), x + colW / 2, y0 - 4);
       rd.matches.forEach((m, i) => {
         const y = yOf(r, i);
@@ -319,19 +337,19 @@ const Export = (() => {
         const w = m.status === 'done' && m.result ? m.result.winner : null;
         const ds = (typeof Engine !== 'undefined' && Engine.displayScore) ? Engine.displayScore(m) : { a: m.scoreA, b: m.scoreB };
         drawBracketSide(c, P, t, m.a, ds.a, x, y, colW, rowH, w === m.a && m.a && m.a !== 'BYE', false);
-        c.fillStyle = P.muted; c.font = '12px Tahoma'; c.textAlign = 'center';
+        c.fillStyle = P.muted; c.font = '12px Tahoma, "Noto Sans Arabic", sans-serif'; c.textAlign = 'center';
         c.fillText(cut(scoreText(t, m), 26), x + colW / 2, y + rowH / 2 + 4);
         drawBracketSide(c, P, t, m.b, ds.b, x, y + rowH / 2, colW, rowH, w === m.b && m.b && m.b !== 'BYE', true);
       });
     });
     drawFooter(c, P);
-    webDownload(cv.toDataURL('image/png'), filename);
+    pngDownload(cv.toDataURL('image/png'), filename);
     return true;
   }
   function drawBracketSide(c, P, t, teamId, score, x, y, colW, rowH, isWin, bottom) {
     const nm = !teamId ? '...' : teamId === 'BYE' ? 'استراحت' : (t.teams.find(v => v.id === teamId) || {}).name || '?';
     c.fillStyle = isWin ? P.accent : P.text;
-    c.font = (isWin ? 'bold ' : '') + '15px Tahoma';
+    c.font = (isWin ? 'bold ' : '') + '15px Tahoma, "Noto Sans Arabic", sans-serif';
     c.textAlign = 'center';
     const yy = y + (bottom ? rowH / 4 + 8 : rowH / 4 + 14);
     const label = cut(nm, Math.max(10, Math.floor(colW / 13))) + (score !== null && score !== undefined && score !== '' ? '  ' + fa(score) : '');
@@ -369,7 +387,7 @@ const Export = (() => {
     const all = Engine.visibleMatches(t);
     const done = all.filter(x => x.m.status === 'done').length;
     const pct = all.length ? Math.round(done / all.length * 100) : 0;
-    const fmtSub = Engine.isDouble(t) ? 'جدول دوحذفی • فصل ۴' : Engine.isAsian(t) ? 'جدول آسیایی • فصل ۳' : Engine.isRoundRobin(t) ? 'جدول دوره‌ای • فصل ۵' : 'جدول تک‌حذفی • فصل ۲';
+    const fmtSub = Engine.isDouble(t) ? 'جدول دوحذفی' : Engine.isAsian(t) ? 'جدول آسیایی' : Engine.isRoundRobin(t) ? 'جدول دوره‌ای' : 'جدول تک‌حذفی';
     const rows = [
       { main: 'نوع جام', sub: fmtSub, badge: '' },
       { main: 'تیم‌ها', sub: fa(t.teams.length) + ' تیم', badge: fa(t.teams.length) },
@@ -597,7 +615,7 @@ const Export = (() => {
     const dbl = Engine.isDouble(t);
     const asn = Engine.isAsian(t);
     const rr = Engine.isRoundRobin(t);
-    const lines = ['\ufeff' + (dbl ? 'جدول دو حذفی (فصل چهارم)' : asn ? 'جدول آسیایی (فصل سوم)' : rr ? 'جدول دوره‌ای (فصل پنجم)' : 'جدول تک‌حذفی (فصل دوم)') + ',"' + (t.name || '') + '"'];
+    const lines = ['\ufeff' + (dbl ? 'جدول دو حذفی' : asn ? 'جدول آسیایی' : rr ? 'جدول دوره‌ای' : 'جدول تک‌حذفی') + ',"' + (t.name || '') + '"'];
     try {
       const mFa = (t.drawMethod === 'seeding' ? 'سیدگذاری' : t.drawMethod === 'combined' ? 'ترکیبی' : t.drawMethod === 'manual' ? 'دستی' : 'قرعه‌کشی');
       if (dbl) {

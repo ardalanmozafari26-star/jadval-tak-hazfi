@@ -165,11 +165,11 @@
       <div id="statsContent" class="stack"></div>
     </section>
 
-    <!-- آموزش فصل دوم و سوم -->
+    <!-- آموزش -->
     <section id="view-learn" class="view hidden">
-      <p class="section-sub">فصل دوم، سوم و چهارم کتاب • تک‌حذفی / آسیایی / دو‌حذفی</p>
+      <p class="section-sub">آموزش جداول • تک‌حذفی / آسیایی / دو‌حذفی / دوره‌ای</p>
       <h2 class="section-title">آموزش<span class="dot-accent">.</span></h2>
-      <nav id="learnToc" class="toc" aria-label="فهرست فصل‌ها"></nav>
+      <nav id="learnToc" class="toc" aria-label="فهرست بخش‌ها"></nav>
       <div id="learnContent" class="stack"></div>
     </section>
 
@@ -196,18 +196,18 @@
         </label>
         <label class="row"><span>قرعه استراحت (BYE)</span>
           <select id="setBye" onchange="UI.saveTournamentSettings()">
-            <option value="top">به سیدهای بالا (کتابی)</option>
+            <option value="top">به سیدهای بالا</option>
             <option value="random">تصادفی</option>
           </select>
         </label>
-        <label class="row"><span>نمایش استراحت (فصل دوم)</span>
+        <label class="row"><span>نمایش استراحت</span>
           <select id="setByeDisplay" onchange="UI.saveTournamentSettings()">
             <option value="higher">توان بالاتر — با نوشتن B</option>
             <option value="lower">توان کمتر/پیشرفته — بدون B</option>
           </select>
         </label>
         <div id="pointsBox" class="hidden">
-          <div class="set-group"><span class="gi" aria-hidden="true">🏅</span><div><h3>امتیاز جدول دوره‌ای</h3><span class="sub">فصل ۵ — امتیاز هر رشته متفاوت است</span></div></div>
+          <div class="set-group"><span class="gi" aria-hidden="true">🏅</span><div><h3>امتیاز جدول دوره‌ای</h3><span class="sub">امتیاز هر رشته متفاوت است</span></div></div>
           <label class="row"><span>امتیاز برد</span><input type="number" id="setPtWin" class="field" min="0" max="9" value="3" onchange="UI.saveTournamentSettings()"></label>
           <label class="row"><span>امتیاز مساوی</span><input type="number" id="setPtDraw" class="field" min="0" max="9" value="1" onchange="UI.saveTournamentSettings()"></label>
           <label class="row"><span>امتیاز باخت</span><input type="number" id="setPtLoss" class="field" min="0" max="9" value="0" onchange="UI.saveTournamentSettings()"></label>
