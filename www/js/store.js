@@ -94,15 +94,15 @@ const Store = (() => {
     return copy;
   }
 
-  function addTeam(tid, data) {
+  function addTeam(tid, data, quiet) {
     const t = db.tournaments.find(x => x.id === tid);
     if (!t) return null;
     const cap = t.targetSize || 64;
-    if (t.teams.length >= 64) { alert('حداکثر ۶۴ تیم مجاز است.'); return null; }
-    if (t.teams.length >= cap) { alert('ظرفیت جدول (' + cap + ' تیم) پر شد.'); return null; }
+    if (t.teams.length >= 64) { if (!quiet) alert('حداکثر ۶۴ تیم مجاز است.'); return null; }
+    if (t.teams.length >= cap) { if (!quiet) alert('ظرفیت جدول (' + cap + ' تیم) پر شد.'); return null; }
     const name = (data.name || '').trim();
-    if (!name) { alert('نام تیم الزامی است.'); return null; }
-    if (t.teams.some(x => x.name === name)) { alert('این نام تکراری است.'); return null; }
+    if (!name) { if (!quiet) alert('نام تیم الزامی است.'); return null; }
+    if (t.teams.some(x => x.name === name)) { if (!quiet) alert('این نام تکراری است.'); return null; }
     const team = {
       id: uid(), name,
       short: name.slice(0, 2),
@@ -127,29 +127,30 @@ const Store = (() => {
     }
     if (patch.rank != null && String(patch.rank) !== String(tm.rank) && t.rounds && t.rounds.length) {
       if (!confirm('تغییر سید بعد از قرعه‌کشی جدول را به‌هم می‌ریزد. جدول ریست شود؟')) return;
-      t.rounds = []; t.thirdPlace = null; t.champion = null; t.status = 'setup';
-      t.lbRounds = []; t.gf = null; t.losses = null; t.eliminated = null;
-      t.asianRounds = []; t.asianTree = null;
-      t.repechage = null; t.calc = null; t.drawMethod = null; t.drawSeeded = 0; t.celebrated = false;
+      resetBracketState(t);
     }
     Object.assign(tm, patch);
     t.updatedAt = Date.now();
     save();
   }
 
-  function removeTeam(tid, teamId) {
+  function removeTeam(tid, teamId, skipConfirm) {
     const t = db.tournaments.find(x => x.id === tid);
     if (!t) return;
     if (t.rounds && t.rounds.length) {
-      if (!confirm('جدول قرعه‌کشی شده است. با حذف تیم، جدول ریست می‌شود. ادامه؟')) return;
-      t.rounds = []; t.thirdPlace = null; t.champion = null; t.status = 'setup';
-      t.lbRounds = []; t.gf = null; t.losses = null; t.eliminated = null;
-      t.asianRounds = []; t.asianTree = null;
-      t.repechage = null; t.calc = null; t.drawMethod = null; t.drawSeeded = 0; t.celebrated = false;
+      if (!skipConfirm && !confirm('جدول قرعه‌کشی شده است. با حذف تیم، جدول ریست می‌شود. ادامه؟')) return;
+      resetBracketState(t);
     }
     t.teams = t.teams.filter(x => x.id !== teamId);
     t.updatedAt = Date.now();
     save();
+  }
+  /* ریست کامل ساختار جدول (مشترک بین حذف تیم و تغییر سید) */
+  function resetBracketState(t) {
+    t.rounds = []; t.thirdPlace = null; t.champion = null; t.status = 'setup';
+    t.lbRounds = []; t.gf = null; t.losses = null; t.eliminated = null;
+    t.asianRounds = []; t.asianTree = null;
+    t.repechage = null; t.calc = null; t.drawMethod = null; t.drawSeeded = 0; t.celebrated = false;
   }
 
   function exportJSON() { return JSON.stringify(db); }

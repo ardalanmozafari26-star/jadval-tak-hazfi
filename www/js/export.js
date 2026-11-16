@@ -7,10 +7,9 @@ const Export = (() => {
   function scoreText(t, m) {
     if (m.status !== 'done' || !m.result) return '—';
     if (m.result.type === 'bye') return 'استراحت (B)';
-    if (m.result.type !== 'score') {
+    if (m.result.type !== 'score' && m.result.type !== 'draw') {
       if (m.result.type === 'walkover') return 'انصراف';
       if (m.result.type === 'dq') return 'حذف انضباطی';
-      if (m.result.type === 'draw') return 'مساوی';
       if (m.result.type === 'pick') return 'برد';
       return 'حذف';
     }
@@ -21,6 +20,7 @@ const Export = (() => {
     }
     const totA = (m.scoreA || 0) + (m.etA || 0), totB = (m.scoreB || 0) + (m.etB || 0);
     let s = totA + ' - ' + totB;
+    if (m.result.type === 'draw') s += ' (مساوی)';
     if (m.etA !== null && m.etA !== undefined) s += ' (و.ا)';
     if (m.penA !== null && m.penA !== undefined) s += ' پنالتی ' + m.penA + '-' + m.penB;
     return s;
@@ -58,8 +58,8 @@ const Export = (() => {
     c.closePath();
   }
 
-  function drawHeader(c, P, title, sub, fmt) {
-    const W = SQ;
+  function drawHeader(c, P, title, sub, fmt, W) {
+    W = W || SQ;
     c.textAlign = 'right';
     c.fillStyle = P.text; c.font = 'bold 36px Tahoma, "Noto Sans Arabic", sans-serif';
     c.fillText(cut(title, 30), W - PAD, 78);
@@ -72,12 +72,12 @@ const Export = (() => {
     c.strokeStyle = P.line; c.lineWidth = 2;
     c.beginPath(); c.moveTo(PAD, HEADER_H - 26); c.lineTo(W - PAD, HEADER_H - 26); c.stroke();
   }
-  function drawFooter(c, P) {
-    const W = SQ;
+  function drawFooter(c, P, W) {
+    W = W || SQ;
     c.strokeStyle = P.line; c.lineWidth = 2;
     c.beginPath(); c.moveTo(PAD, SQ - FOOTER_H + 18); c.lineTo(W - PAD, SQ - FOOTER_H + 18); c.stroke();
     let dateStr = '';
-    try { dateStr = new Date().toLocaleDateString('fa-IR'); } catch (e) {}
+    try { dateStr = Engine.faDate(Engine.todayISO()); } catch (e) {}
     c.textAlign = 'center'; c.fillStyle = P.muted; c.font = '16px Tahoma, "Noto Sans Arabic", sans-serif';
     c.fillText('ساخته‌شده با جدول تک‌حذفی' + (dateStr ? ' • ' + dateStr : ''), W / 2, SQ - 34);
   }
@@ -374,6 +374,147 @@ const Export = (() => {
     ], safeName(t.name) + '-league-' + stamp() + '.png');
   }
 
+  /* ============================================================
+     خروجی «نمای کل مسیر» — براکت کامل در یک تصویر مربعی
+     (همان چیدمانی که در نمای کل مسیر برنامه می‌بینید)
+     ============================================================ */
+  function overviewStages(t) {
+    return stageList(t).filter(s => s.matches && s.matches.length);
+  }
+  function pngOverview() {
+    const t = needT(); if (!t) return;
+    if (!t.rounds.length) { alert('جدولی برای خروجی وجود ندارد.'); return; }
+    const stages = overviewStages(t);
+    if (!stages.length) { alert('بازی‌ای برای خروجی نیست.'); return; }
+    const base = safeName(t.name) + '-overview-' + stamp();
+    const pages = splitOverviewPages(stages);
+    pages.forEach((pg, i) => renderOverviewPage(t, pg, i, pages.length, base));
+  }
+  /* اگر جدول بزرگ باشد، مراحل به چند تصویر تقسیم می‌شوند تا متن خوانا بماند */
+  function splitOverviewPages(stages) {
+    const MIN_COL = 168, MIN_ROW = 46;
+    const pages = [];
+    let cur = [];
+    for (const st of stages) {
+      const cand = cur.concat([st]);
+      const rows = Math.max.apply(null, cand.map(s => s.matches.length).concat([1]));
+      const colW = Math.floor((SQ - PAD * 2 - (cand.length - 1) * 16) / cand.length);
+      const rowH = Math.floor((SQ - FOOTER_H - (HEADER_H + 42)) / rows);
+      if (cur.length && (colW < MIN_COL || rowH < MIN_ROW)) { pages.push(cur); cur = [st]; }
+      else cur = cand;
+    }
+    if (cur.length) pages.push(cur);
+    return pages.length ? pages : [stages];
+  }
+  function renderOverviewPage(t, stages, pageIdx, pageCount, filename) {
+    const P = pal();
+    const n = stages.length;
+    const rows = Math.max.apply(null, stages.map(s => s.matches.length).concat([1]));
+    // اندازهٔ مربع متناسب با بزرگی جدول (تا متن خوانا بماند)
+    const needW = n * 200 + PAD * 2;
+    const needH = rows * 50 + HEADER_H + FOOTER_H + 60;
+    const S = Math.min(2600, Math.max(SQ, Math.ceil(Math.max(needW, needH))));
+    const GAP = 18, TITLE_H = 34;
+    const colW = Math.floor((S - PAD * 2 - (n - 1) * GAP) / n);
+    const availH = S - FOOTER_H - (HEADER_H + TITLE_H + 14);
+    const rowH = Math.max(40, Math.min(96, Math.floor(availH / rows) - 8));
+    const top = HEADER_H + TITLE_H + 10;
+
+    const scale = 2;
+    const cv = document.createElement('canvas');
+    cv.width = S * scale; cv.height = S * scale;
+    const c = cv.getContext('2d');
+    c.scale(scale, scale);
+    c.fillStyle = P.bg; c.fillRect(0, 0, S, S);
+
+    const sub = 'نمای کل مسیر' + (pageCount > 1 ? ' — بخش ' + fa(pageIdx + 1) + ' از ' + fa(pageCount) : '');
+    drawHeader(c, P, t.name, sub, fmtLabel(t), S);
+
+    // ستون‌ها از راست به چپ: دور اول در سمت راست
+    const xOf = i => S - PAD - colW - i * (colW + GAP);
+    const pos = {};
+    stages.forEach((st, ci) => {
+      const cnt = st.matches.length;
+      const colH = cnt * rowH;
+      const y0 = top + Math.max(0, (availH - colH) / 2);
+      st.matches.forEach((m, i) => {
+        const y = y0 + i * rowH;
+        pos[m.id] = { x: xOf(ci), y: y, cx: xOf(ci) + colW / 2, cy: y + rowH / 2, col: ci };
+      });
+    });
+
+    // خطوط اتصال بین ستون‌های مجاور
+    c.save();
+    c.globalAlpha = .4;
+    c.strokeStyle = P.muted; c.lineWidth = 2;
+    stages.forEach((st, ci) => {
+      st.matches.forEach(m => {
+        const tp = pos[m.id]; if (!tp) return;
+        [m.pa, m.pb].forEach(srcId => {
+          if (!srcId) return;
+          const sp = pos[srcId]; if (!sp || sp.col >= ci) return;   // فقط ستون قبلی
+          const lane = tp.x + colW + GAP / 2;
+          c.beginPath();
+          c.moveTo(sp.x, sp.cy);
+          c.lineTo(lane, sp.cy);
+          c.lineTo(lane, tp.cy);
+          c.lineTo(tp.x + colW, tp.cy);
+          c.stroke();
+        });
+      });
+    });
+    c.restore();
+
+    // عنوان مراحل و کارت بازی‌ها
+    stages.forEach((st, ci) => {
+      const x = xOf(ci);
+      const done = st.matches.filter(m => m.status === 'done').length;
+      c.textAlign = 'center';
+      c.fillStyle = P.accent; c.font = 'bold 18px Tahoma, "Noto Sans Arabic", sans-serif';
+      c.fillText(cut(st.title, 20), x + colW / 2, HEADER_H + 18);
+      c.fillStyle = P.muted; c.font = '12px Tahoma, "Noto Sans Arabic", sans-serif';
+      c.fillText(fa(done) + '/' + fa(st.matches.length), x + colW / 2, HEADER_H + 36);
+
+      st.matches.forEach(m => {
+        const p = pos[m.id]; if (!p) return;
+        const w = (m.status === 'done' && m.result) ? m.result.winner : null;
+        const ds = Engine.displayScore(m);
+        const h = rowH - 6;
+        c.fillStyle = P.card;
+        c.strokeStyle = (m.status === 'done') ? P.accent : P.line;
+        c.lineWidth = 2;
+        roundRect(c, p.x, p.y, colW, h, 10); c.fill(); c.stroke();
+        if (m.status === 'done' && m.result && m.result.type === 'bye') {
+          c.fillStyle = P.muted; c.font = '12px Tahoma, "Noto Sans Arabic", sans-serif';
+          c.textAlign = 'center';
+          c.fillText('استراحت (B)', p.x + colW / 2, p.y + h / 2 + 4);
+          return;
+        }
+        const maxChars = Math.max(6, Math.floor((colW - 34) / 12));
+        const side = (id, score, isBottom) => {
+          const tm = (id && id !== 'BYE') ? (t.teams.find(v => v.id === id) || null) : null;
+          const nm = !id ? '…' : (id === 'BYE' ? 'استراحت' : (tm ? tm.name : '؟'));
+          const isW = w && id && w === id;
+          c.font = (isW ? 'bold ' : '') + '13px Tahoma, "Noto Sans Arabic", sans-serif';
+          c.textAlign = 'right';
+          c.fillStyle = isW ? P.accent : P.text;
+          const y = isBottom ? (p.y + h - 9) : (p.y + 16);
+          c.fillText(cut(nm, maxChars), p.x + colW - 10, y);
+          c.textAlign = 'left';
+          c.fillStyle = isW ? P.accent : P.muted;
+          const sc = (score === null || score === undefined || score === '') ? '' : fa(score);
+          c.fillText(sc, p.x + 10, y);
+        };
+        side(m.a, ds.a, false);
+        side(m.b, ds.b, true);
+      });
+    });
+
+    drawFooter(c, P, S);
+    const fn = pageCount > 1 ? (filename + '-' + (pageIdx + 1) + '.png') : (filename + '.png');
+    pngDownload(cv.toDataURL('image/png'), fn);
+  }
+
   function print() {
     const t = Store.active();
     if (!t || !t.rounds.length) { alert('جدولی برای چاپ وجود ندارد.'); return; }
@@ -668,5 +809,5 @@ const Export = (() => {
     shareTextFile(lines.join('\n'), t.name + '.csv', 'text/csv;charset=utf-8');
   }
 
-  return { png, print, backup, restore, csv, scoreText, pngStats, pngStatsSummary, pngStatsRank, pngStatsPerf, pngStatsScorers, pngStatsSpecial, pngTeams, pngMatches, pngMatch, pngHome, pngLeagueTable };
+  return { png, pngOverview, print, backup, restore, csv, scoreText, pngStats, pngStatsSummary, pngStatsRank, pngStatsPerf, pngStatsScorers, pngStatsSpecial, pngTeams, pngMatches, pngMatch, pngHome, pngLeagueTable };
 })();

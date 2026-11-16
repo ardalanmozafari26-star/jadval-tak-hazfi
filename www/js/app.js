@@ -8,6 +8,8 @@
     document.getElementById('menuBtn').addEventListener('click', UI.openDrawer);
     document.getElementById('drawerClose').addEventListener('click', UI.closeDrawer);
     document.getElementById('drawerOverlay').addEventListener('click', UI.closeDrawer);
+    const moreOverlay = document.getElementById('moreOverlay');
+    if (moreOverlay) moreOverlay.addEventListener('click', UI.closeMore);
     const mk = () => UI.openTournamentDialog();
     document.getElementById('drawerNew').addEventListener('click', () => { UI.closeDrawer(); mk(); });
     document.getElementById('modalOverlay').addEventListener('click', e => {

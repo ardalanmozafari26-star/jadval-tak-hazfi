@@ -448,9 +448,13 @@ const Engine = (() => {
     // ۳) قهرمان
     const gf = t.gf;
     if (gf && gf.status === 'done' && gf.result && gf.result.winner && gf.result.winner !== 'BYE') {
+      if (t.champion !== gf.result.winner) t.celebrated = false;
       t.champion = gf.result.winner;
       t.status = 'done';
-    } else t.status = 'ongoing';
+    } else {
+      if (t.champion) { t.champion = null; t.celebrated = false; }
+      t.status = 'ongoing';
+    }
     // ۴) شمارش باخت‌ها و حذف‌شدگان
     t.losses = deLosses(t);
     t.eliminated = {};
@@ -560,7 +564,12 @@ const Engine = (() => {
     if (!w || m.id === 'third') return;
     if (isDouble(t)) { deOnDecide(t, m); return; }
     if (isAsian(t) && m.asian) { asianResolve(t); Store.save(); return; }
-    if (m.round === t.rounds.length - 1) { t.champion = w; t.status = 'done'; if (isAsian(t)) asianResolve(t); Store.save(); return; }
+    if (m.round === t.rounds.length - 1) {
+      if (t.champion !== w) t.celebrated = false;
+      t.champion = w; t.status = 'done';
+      if (isAsian(t)) asianResolve(t);
+      Store.save(); return;
+    }
     const nx = nextSlot(m.round, m.index);
     const nm = findMatch(t, 'r' + nx.r + 'm' + nx.m);
     if (nm) nm[nx.slot] = w;
@@ -577,7 +586,7 @@ const Engine = (() => {
     if (isRoundRobin(t)) { roundRefresh(t); Store.save(); return; }
     if (isAsian(t) && m.asian) { asianClearChain(t, m); asianResolve(t); Store.save(); return; }
     if (m.id !== 'third') {
-      if (m.round === t.rounds.length - 1) { t.champion = null; if (t.status === 'done') t.status = 'ongoing'; }
+      if (m.round === t.rounds.length - 1) { t.champion = null; t.celebrated = false; if (t.status === 'done') t.status = 'ongoing'; }
       else {
         const nx = nextSlot(m.round, m.index);
         const nm = findMatch(t, 'r' + nx.r + 'm' + nx.m);
@@ -640,7 +649,7 @@ const Engine = (() => {
     const out = [];
     if (!t.repechage) return out;
     ['champBracket', 'runnerBracket'].forEach(k => {
-      const br = t.repechage[k === 'champBracket' ? 'champ' : 'runner'];
+      const br = t.repechage[k];
       if (br && br.rounds) br.rounds.forEach(rd => rd.matches.forEach(m => out.push({ roundTitle: 'رپشاژ', m })));
     });
     if (t.repechage.playoff) out.push({ roundTitle: 'پل‌آف سوم', m: t.repechage.playoff });
@@ -748,7 +757,7 @@ const Engine = (() => {
     t.rounds = []; t.thirdPlace = null; t.champion = null; t.status = 'setup';
     t.repechage = null; t.calc = null; t.drawMethod = null;
     t.lbRounds = []; t.gf = null; t.losses = null; t.eliminated = null;
-    t.asianRounds = []; t.asianTree = null;
+    t.asianRounds = []; t.asianTree = null; t.celebrated = false;
     Store.save();
   }
 
@@ -1112,10 +1121,18 @@ const Engine = (() => {
             if (m.status === 'done') clearSelf(m);
             changed = true;
           }
+          const bothBye = (m.a === 'BYE' && m.b === 'BYE');
+          if (bothBye && !m.hidden) { m.hidden = true; changed = true; }
+          if (!bothBye && m.hidden) { m.hidden = false; changed = true; }
           if (m.status !== 'done' && m.a && m.b && (m.a === 'BYE' || m.b === 'BYE')) {
-            const w = (m.a === 'BYE') ? m.b : m.a;
-            m.status = 'done';
-            m.result = { type: 'bye', winner: w, loser: 'BYE', note: 'صعود با قرعه استراحت' };
+            if (bothBye) {
+              m.status = 'done'; m.hidden = true;
+              m.result = { type: 'bye', winner: 'BYE', loser: 'BYE', note: 'استراحت' };
+            } else {
+              const w = (m.a === 'BYE') ? m.b : m.a;
+              m.status = 'done'; m.hidden = false;
+              m.result = { type: 'bye', winner: w, loser: 'BYE', note: 'صعود با قرعه استراحت' };
+            }
             changed = true;
           }
         }
@@ -1286,7 +1303,9 @@ const Engine = (() => {
     const done = all.length > 0 && all.every(x => x.m.status === 'done');
     if (done) {
       const tbl = leagueTable(t);
-      t.champion = tbl.length ? tbl[0].id : null;
+      const champ = tbl.length ? tbl[0].id : null;
+      if (t.champion !== champ) t.celebrated = false;
+      t.champion = champ;
       t.status = 'done';
     } else {
       if (t.champion) { t.champion = null; t.celebrated = false; }
@@ -1317,7 +1336,7 @@ const Engine = (() => {
     const draws = tbl.reduce((n, r) => n + (r.drawn || 0), 0) / 2;
     let goals = 0;
     for (const { m } of allMatches(t)) {
-      if (!rrCount(m) || m.status !== 'done' || !m.result || m.result.type !== 'score') continue;
+      if (!rrCount(m) || m.status !== 'done' || !m.result || (m.result.type !== 'score' && m.result.type !== 'draw')) continue;
       const tt = totals(m);
       goals += (Number(tt.a) || 0) + (Number(tt.b) || 0);
     }
@@ -1357,7 +1376,7 @@ const Engine = (() => {
       t.teams.forEach(tm => { agg[tm.id] = { id: tm.id, name: tm.name, pts: 0, gd: 0, gf: 0, played: 0 }; });
       for (let r = 0; r <= upto; r++) {
         for (const m of (rounds[r].matches || [])) {
-          if (!rrCount(m) || m.status !== 'done' || !m.result || m.result.type !== 'score') continue;
+          if (!rrCount(m) || m.status !== 'done' || !m.result || (m.result.type !== 'score' && m.result.type !== 'draw')) continue;
           if (!agg[m.a] || !agg[m.b]) continue;
           const tt = totals(m);
           agg[m.a].played++; agg[m.b].played++;
@@ -1467,7 +1486,7 @@ const Engine = (() => {
     const byes = visibleMatches(t).filter(x => x.m.result && x.m.result.type === 'bye').length;
     let goals = 0;
     real.forEach(x => {
-      if (x.m.status !== 'done' || !x.m.result || x.m.result.type !== 'score') return;
+      if (x.m.status !== 'done' || !x.m.result || (x.m.result.type !== 'score' && x.m.result.type !== 'draw')) return;
       const tt = totals(x.m);
       goals += (Number(tt.a) || 0) + (Number(tt.b) || 0);
     });
@@ -1713,7 +1732,7 @@ const Engine = (() => {
   function scorersTable(t) {
     const map = {};
     for (const { m } of allMatches(t)) {
-      if (m.status !== 'done' || !m.result || m.result.type !== 'score') continue;
+      if (m.status !== 'done' || !m.result || (m.result.type !== 'score' && m.result.type !== 'draw')) continue;
       if (!Array.isArray(m.scorers)) continue;
       for (const s of m.scorers) {
         const key = s.name + '|' + (s.team || '');
@@ -1768,13 +1787,12 @@ const Engine = (() => {
     return out;
   }
   function buildMiniBracket(ids, prefix) {
-    // ids: ترتیب ورود؛ اگر توان ۲ نبود BYE می‌گیرد (مثل جدول اصلی)
+    // ids: ترتیب ورود؛ BYEها طبق قاعدهٔ کتابی (جفت‌سید) پخش می‌شوند تا هر بازی حداکثر یک استراحت داشته باشد
     const n = ids.length;
     if (!n) return { rounds: [], winner: null };
     if (n === 1) return { rounds: [], winner: ids[0], single: ids[0] };
     const slots = nextPow2(n);
-    const padded = [...ids];
-    while (padded.length < slots) padded.push('BYE');
+    const placed = placeTextbook(ids, n, slots);
     const rounds = [];
     const nR = Math.log2(slots);
     for (let r = 0; r < nR; r++) {
@@ -1783,7 +1801,7 @@ const Engine = (() => {
       for (let i = 0; i < parts / 2; i++) {
         const m = mkMatch(r, i, null, null);
         m.id = prefix + 'r' + r + 'm' + i;
-        if (r === 0) { m.a = padded[i * 2]; m.b = padded[i * 2 + 1]; }
+        if (r === 0) { m.a = placed[i * 2]; m.b = placed[i * 2 + 1]; }
         else { m.pa = prefix + 'r' + (r - 1) + 'm' + (i * 2); m.pb = prefix + 'r' + (r - 1) + 'm' + (i * 2 + 1); }
         rd.matches.push(m);
       }
@@ -1794,6 +1812,7 @@ const Engine = (() => {
   function repKey(g) { return g === 'champ' ? 'champBracket' : 'runnerBracket'; }
   function buildRepechage(t) {
     if (isDouble(t)) { alert('جدول دو حذفی خودش فرصت جبران می‌دهد؛ رپشاژ لازم نیست.'); return false; }
+    if (isAsian(t) || isRoundRobin(t)) { alert('در جدول آسیایی و دوره‌ای همهٔ شرکت‌کنندگان رتبه‌بندی می‌شوند؛ نیازی به رپشاژ نیست.'); return false; }
     const f = finalists(t);
     if (!f) { alert('اول فینال را برگزار کن تا قهرمان و نایب‌قهرمان مشخص شوند 🏁'); return false; }
     if (!f.runner || f.runner === 'BYE') { alert('نایب‌قهرمان مشخص نیست.'); return false; }
@@ -1938,10 +1957,17 @@ const Engine = (() => {
   function previewPairs(t, method, seededCount) {
     const n = t.teams.length;
     if (n < 2) return [];
-    const slots = nextPow2(n);
     const m = normMethod(method || 'lottery');
     const ordered = orderTeams(t, m === 'seeding' || m === 'combined' ? 'seeding' : m);
     const ids = ordered.map(x => x.id);
+    if (isRoundRobin(t)) {
+      let col = ids.slice();
+      if (col.length % 2 === 1) col = col.concat(['BYE']);
+      return roundRobinPairs(col).map(p => ({
+        a: p[0], b: p[1], sum: seedOf(t, p[0]) + seedOf(t, p[1])
+      }));
+    }
+    const slots = nextPow2(n);
     let arr;
     if (m === 'seeding') arr = placeTextbook(ids, n, slots);
     else if (m === 'combined') arr = placeCombined(ids, n, slots, seededCount != null ? seededCount : defaultSeeded(n));
@@ -1964,10 +1990,46 @@ const Engine = (() => {
 
   function faDate(iso) {
     if (!iso) return '—';
-    try { return new Date(iso + 'T00:00:00').toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' }); }
+    try {
+      if (typeof Jalali !== 'undefined') {
+        const j = Jalali.toJalali(iso);
+        if (j) return Jalali.fa(j[2]) + ' ' + Jalali.MONTHS[j[1] - 1] + ' ' + Jalali.fa(j[0]);
+      }
+      return new Date(iso + 'T00:00:00').toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
     catch (e) { return iso; }
   }
-  const faNum = n => (n === null || n === undefined || n === '') ? '—' : Number(n).toLocaleString('fa-IR');
+  /* تاریخ شمسی همراه نام روز هفته */
+  function faDateWeek(iso) {
+    if (!iso) return '—';
+    try {
+      if (typeof Jalali !== 'undefined') {
+        const j = Jalali.toJalali(iso);
+        if (j) return Jalali.WEEK_FULL[Jalali.weekdayIndex(iso)] + ' ' + Jalali.fa(j[2]) + ' ' + Jalali.MONTHS[j[1] - 1] + ' ' + Jalali.fa(j[0]);
+      }
+    } catch (e) {}
+    return faDate(iso);
+  }
+  /* تاریخ شمسی عددی: ۱۴۰۵/۰۸/۲۵ */
+  function faDateShort(iso) {
+    if (!iso) return '—';
+    try {
+      if (typeof Jalali !== 'undefined') return Jalali.short(iso) || '—';
+    } catch (e) {}
+    return faDate(iso);
+  }
+  /* عدد فارسی: ارقام و جداکنندهٔ هزارگان فارسی (بدون وابستگی به ICU مرورگر) */
+  const faNum = n => {
+    if (n === null || n === undefined || n === '') return '—';
+    const num = Number(n);
+    if (!isFinite(num)) return '—';
+    const neg = num < 0;
+    const parts = Math.abs(num).toString().split('.');
+    const int = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '٬');
+    const dec = parts[1] ? '٫' + parts[1] : '';
+    const body = int + dec;
+    return (neg ? '−' : '') + (typeof Jalali !== 'undefined' ? Jalali.fa(body) : body);
+  };
 
   return {
     nextPow2, lowerPow2, baseFor, lowerFor, roundsCount, totalMatches, byeCount,
@@ -1977,7 +2039,7 @@ const Engine = (() => {
     roundTitle, generateBracket, findMatch, teamName,
     setResult, clearResult, setSchedule, resetBracket, swapTeams,
     allMatches, matchNumber, record, finalRank, fairPoints, totals, displayScore,
-    matchWinner, mvpName, mvpStatsLine, tournamentMvp, scorersTable, championPath, todayISO, faDate, faNum,
+    matchWinner, mvpName, mvpStatsLine, tournamentMvp, scorersTable, championPath, todayISO, faDate, faDateWeek, faDateShort, faNum,
     isRealMatch, realMatches, statsOverview, seedRankOf, exitBuckets, cupUpsets, asianDropMap, asianFrontBack,
     finalists, losersTo, buildRepechage, setRepechageResult, clearRepechage, findRepMatch, isRepechageMatch,
     buildDouble, isDouble, deAllMatches, deRefresh, deLosses, deCalcInfo, deLbSizes, deSource, deClearDown,

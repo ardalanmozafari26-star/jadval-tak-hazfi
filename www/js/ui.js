@@ -14,6 +14,11 @@ const UI = (() => {
     if (bracketMode === 'list') overviewOn = false;
     renderBracket();
   }
+  function setBracketMode(mode) {
+    bracketMode = mode === 'list' ? 'list' : 'tree';
+    if (bracketMode === 'list') overviewOn = false;
+    renderBracket();
+  }
   function showRound(i) {
     currentRound = i;
     overviewOn = false;
@@ -33,19 +38,26 @@ const UI = (() => {
     openModal('<h2>ابزارهای جدول</h2>' +
       '<p class="note">نما، چیدمان مجدد، رپشاژ و خروجی‌ها</p>' +
       '<div class="grid2">' +
-      '<button class="action" onclick="UI.closeModal();UI.toggleOverview()">◈ نمای کل مسیر</button>' +
-      '<button class="action" onclick="UI.closeModal();UI.switchView(\'matches\')">📋 نمای فهرستی</button>' +
+      '<button class="action" onclick="UI.closeModal();UI.setBracketMode(\'list\')">📋 نمای فهرستی</button>' +
+      '<button class="action" onclick="UI.closeModal();UI.setBracketMode(\'tree\')">🌳 نمای درختی</button>' +
+      '<button class="action" onclick="UI.closeModal();UI.toggleOverview()">◈ کل مسیر</button>' +
       '<button class="action" onclick="UI.closeModal();UI.openDrawDialog()">🎲 چیدمان مجدد (الف/ب/ج)</button>' +
       ((dbl || asn) ? '' : '<button class="action" onclick="UI.closeModal();UI.openSwapDialog()">🔀 جابه‌جایی سید نزدیک</button>') +
       ((dbl || asn || rr) ? '' : '<button class="action" onclick="UI.closeModal();UI.buildRepechage()">🥉 رپشاژ (شانس مجدد)</button>') +
       '<button class="action" onclick="UI.closeModal();UI.switchView(\'learn\')">📖 آموزش جداول</button>' +
+      '<button class="action" onclick="UI.closeModal();UI.switchView(\'stats\')">📊 آمار و رده‌بندی</button>' +
+      '</div>' +
+      '<div class="modal-btns">' +
+      '<button class="action" onclick="UI.closeModal();Export.pngOverview()">🖼️ نمای کل مسیر</button>' +
       '<button class="action" onclick="UI.closeModal();Export.png()">🖼️ عکس مربعی</button>' +
-      '<button class="action" onclick="UI.closeModal();Export.print()">🖨️ چاپ / PDF</button></div>' +
-      '<div class="modal-btns"><button class="action" onclick="UI.closeModal();Export.csv()">📊 خروجی CSV (با محاسبات و رپشاژ)</button></div>');
+      '<button class="action" onclick="UI.closeModal();Export.print()">🖨️ چاپ / PDF</button>' +
+      '<button class="action" onclick="UI.closeModal();Export.csv()">📊 CSV</button></div>');
   }
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  /* ساعت با ارقام فارسی */
+  const faTime = s => (typeof Jalali !== 'undefined') ? Jalali.fa(s) : String(s || '');
 
   const SPORTS = { football: 'فوتبال', futsal: 'فوتسال', volleyball: 'والیبال', basketball: 'بسکتبال', tennis: 'تنیس', wrestling: 'کشتی', custom: 'آزاد' };
   const STATUS = { setup: 'آماده‌سازی', ongoing: 'در حال برگزاری', done: 'به پایان رسید' };
@@ -96,9 +108,9 @@ const UI = (() => {
     home: null,
     bracket: { icon: '🎲', fn: () => UI.openDrawDialog() },
     teams: { icon: '＋', fn: () => UI.openTeamDialog() },
-    matches: { icon: '🖼️', fn: () => Export.pngMatches() },
-    stats: { icon: '🖼️', fn: () => Export.pngStats() },
-    learn: { icon: '🎲', fn: () => UI.openDrawDialog() },
+    matches: { icon: '✍️', fn: () => { const t = Store.active(); const nx = t && Engine.visibleMatches(t).find(x => x.m.status !== 'done' && x.m.a && x.m.b && x.m.a !== 'BYE' && x.m.b !== 'BYE'); if (nx) UI.openMatchDialog(nx.m.id); else UI.switchView('matches'); } },
+    stats: { icon: '🖼️', fn: () => Export.pngStatsSummary() },
+    learn: null,
     settings: null
   };
   function updateFab() {
@@ -120,17 +132,15 @@ const UI = (() => {
     if (!btn) return;
     const br = bar.getBoundingClientRect(), r = btn.getBoundingClientRect();
     const x = Math.max(0, r.left - br.left + 4), w = Math.max(8, r.width - 8);
-    ind.style.transform = 'translateX(' + x + 'px) scaleX(' + w + 'px)';
+    ind.style.transform = 'translateX(' + x + 'px) scaleX(' + w + ')';
   }
 
   function switchView(v) {
+    if (v === 'more') { openMore(); return; }
+    closeMore();
     view = v;
     if ($('views')) $('views').scrollTop = 0;
-    document.querySelectorAll('#tabbar button').forEach(b => {
-      const on = b.dataset.view === v;
-      b.classList.toggle('active', on);
-      if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
-    });
+    highlightNav();
     document.querySelectorAll('.view').forEach(s => s.classList.add('hidden'));
     $('view-' + v).classList.remove('hidden');
     render();
@@ -138,6 +148,41 @@ const UI = (() => {
     updateNavBadge();
     requestAnimationFrame(moveTabInd);
   }
+
+  function highlightNav(forceMore) {
+    const more = forceMore || (view === 'stats' || view === 'learn' || view === 'settings');
+    const nav = more ? 'more' : view;
+    document.querySelectorAll('#tabbar button').forEach(b => {
+      const on = b.dataset.view === nav;
+      b.classList.toggle('active', on);
+      if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+    const mb = $('moreNavBtn');
+    if (mb) mb.setAttribute('aria-expanded', more ? 'true' : 'false');
+  }
+
+  function openMore() {
+    closeDrawer();
+    const sh = $('moreSheet'), ov = $('moreOverlay');
+    if (sh) sh.classList.remove('hidden');
+    if (ov) ov.classList.remove('hidden');
+    document.querySelectorAll('.more-item[data-more]').forEach(b => {
+      b.classList.toggle('active', b.dataset.more === view);
+    });
+    highlightNav(true);
+    moreLastFocus = document.activeElement;
+    const first = sh && sh.querySelector('.more-item');
+    if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
+  }
+  function closeMore() {
+    const sh = $('moreSheet'), ov = $('moreOverlay');
+    if (sh) sh.classList.add('hidden');
+    if (ov) ov.classList.add('hidden');
+    highlightNav(false);
+    if (moreLastFocus && moreLastFocus.focus) { try { moreLastFocus.focus({ preventScroll: true }); } catch (e) {} }
+    moreLastFocus = null;
+  }
+  let moreLastFocus = null;
 
   /* نشان تعداد بازی‌های ثبت‌نشده روی تب «بازی‌ها» */
   function updateNavBadge() {
@@ -161,6 +206,12 @@ const UI = (() => {
     const th = Store.db.theme || 'dark';
     const b = $('themeBtn');
     if (b) { b.textContent = th === 'dark' ? '🌙' : '☀️'; b.setAttribute('aria-label', th === 'dark' ? 'روشن کردن تم' : 'تیره کردن تم'); }
+    const mb = $('moreThemeBtn');
+    if (mb) {
+      const ic = mb.querySelector('i'), tx = mb.querySelector('span');
+      if (ic) ic.textContent = th === 'dark' ? '☀️' : '🌙';
+      if (tx) tx.textContent = th === 'dark' ? 'روشن' : 'تیره';
+    }
     document.querySelectorAll('.theme-opt').forEach(o => o.classList.toggle('active', o.dataset.themeOpt === th));
   }
 
@@ -185,9 +236,9 @@ const UI = (() => {
       return;
     }
     $('tournamentName').textContent = t.name;
-    const all = Engine.allMatches(t).filter(x => !x.m.hidden);
-    const played = all.filter(x => x.m.status === 'done').length;
-    const total = all.length;
+    const ov = Engine.statsOverview(t);
+    const played = ov.done;
+    const total = ov.total;
     const seriesLbl = (t.settings.series || 1) > 1 ? 'بهترین از ' + Engine.faNum(t.settings.series) : 'تک‌بازی';
     const fmtLbl = Engine.isDouble(t) ? 'دو حذفی' : (Engine.isAsian(t) ? 'آسیایی' : Engine.isRoundRobin(t) ? 'دوره‌ای' : 'تک حذفی');
     $('tournamentMeta').textContent = (SPORTS[t.sport] || '') + '  /  ' + fmtLbl + '  /  ' + Engine.faNum(t.teams.length) + ' تیم  /  ' + seriesLbl;
@@ -228,10 +279,11 @@ const UI = (() => {
     $('homeContent').classList.toggle('hidden', !t);
     if (!t) return;
     const all = Engine.visibleMatches(t);
-    const done = all.filter(x => x.m.status === 'done').length;
-    const pct = all.length ? Math.round(done / all.length * 100) : 0;
+    const ov = Engine.statsOverview(t);
+    const done = ov.done;
+    const pct = ov.total ? Math.round(ov.done / ov.total * 100) : 0;
     $('homeStats').innerHTML =
-      statCard(t.teams.length, 'تیم', t.teams.length, '👥') + statCard(all.length, 'بازی', all.length, '📅') +
+      statCard(t.teams.length, 'تیم', t.teams.length, '👥') + statCard(ov.total, 'بازی', ov.total, '📅') +
       statCard(done, 'انجام‌شده', done, '✅') + statCard(pct + '٪', 'پیشرفت', null, '📈');
     countUp();
     const next = all.find(x => x.m.status !== 'done' && x.m.a && x.m.b && x.m.a !== 'BYE' && x.m.b !== 'BYE');
@@ -273,16 +325,15 @@ const UI = (() => {
         '<button class="quick-btn" onclick="Export.pngHome()"><span class="qi" aria-hidden="true">🖼️</span>پوستر جام</button>';
     }
     // شمارنده بخش‌ها
-    setCount('homeTodayTitle', todays.length);
-    setCount('homeUpcomingTitle', sched.length);
-    setCount('homeRecentTitle', recent.length);
+    setBadge('homeTodayBadge', todays.length);
+    setBadge('homeUpcomingBadge', sched.length);
+    setBadge('homeRecentBadge', recent.length);
   }
-  function setCount(id, n) {
+  function setBadge(id, n) {
     const el = $(id);
     if (!el) return;
-    let c = el.querySelector('.count');
-    if (!c) { c = document.createElement('span'); c.className = 'count'; el.appendChild(c); }
-    c.textContent = Engine.faNum(n);
+    el.textContent = Engine.faNum(n);
+    el.classList.toggle('show', n > 0);
   }
   const statCard = (v, l, n, ic) => '<div class="stat-card">' + (ic ? '<div class="ic" aria-hidden="true">' + ic + '</div>' : '') + '<div class="v"' + (n !== null && n !== undefined ? ' data-n="' + n + '"' : '') + '>' + (typeof v === 'number' ? Engine.faNum(v) : v) + '</div><div class="l">' + l + '</div></div>';
 
@@ -302,9 +353,9 @@ const UI = (() => {
     if (diff < 0) return Engine.faDate(m.date);
     const d = Math.floor(diff / 86400000);
     if (d <= 0) return 'به‌زودی 🔜';
-    if (d === 1) return 'فردا' + (m.time ? ' ساعت ' + m.time : ' 📌');
+    if (d === 1) return 'فردا' + (m.time ? ' ساعت ' + faTime(m.time) : ' 📌');
     try {
-      const wd = dt.toLocaleDateString('fa-IR', { weekday: 'long' });
+      const wd = (typeof Jalali !== 'undefined') ? Jalali.WEEK_FULL[Jalali.weekdayIndex(m.date)] : dt.toLocaleDateString('fa-IR', { weekday: 'long' });
       if (d < 7) return Engine.faNum(d) + ' روز دیگر (' + wd + ')';
     } catch (e) {}
     return Engine.faDate(m.date);
@@ -335,11 +386,11 @@ const UI = (() => {
     const instant = reducedMotion();
     document.querySelectorAll('#homeStats .v[data-n]').forEach(el => {
       const target = parseInt(el.dataset.n, 10) || 0;
-      if (instant) { el.textContent = target.toLocaleString('fa-IR'); return; }
+      if (instant) { el.textContent = Engine.faNum(target); return; }
       const t0 = performance.now(), dur = 700;
       const step = now => {
         const p = Math.min(1, (now - t0) / dur);
-        el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))).toLocaleString('fa-IR');
+        el.textContent = Engine.faNum(Math.round(target * (1 - Math.pow(1 - p, 3))));
         if (p < 1) requestAnimationFrame(step);
       };
       requestAnimationFrame(step);
@@ -445,7 +496,7 @@ const UI = (() => {
   function metaLine(t, m) {
     const parts = [];
     if (m.date) parts.push(Engine.faDate(m.date));
-    if (m.time) parts.push(m.time);
+    if (m.time) parts.push(faTime(m.time));
     if (m.place) parts.push(m.place);
     if (m.status === 'done' && m.result && m.result.type === 'score') {
       const c = m.cards || {};
@@ -503,11 +554,11 @@ const UI = (() => {
     if (Engine.isRoundRobin(t)) return roundCalcPanelHtml(t);
     const c = ensureCalc(t);
     const byeDisp = (t.settings.byeDisplay || 'higher') === 'higher' ? 'توان بالاتر (با B)' : 'توان کمتر (بدون B)';
-    return '<div class="panel pad calc-panel">' +
-      '<div class="calc-head">' +
+    return '<details class="panel calc-panel">' +
+      '<summary class="calc-head">' +
       '<strong>📐 محاسبات جدول</strong>' +
-      '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></div>' +
-      '<div class="calc-grid">' +
+      '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></summary>' +
+      '<div class="calc-body"><div class="calc-grid">' +
       '<span>مبنا: ' + Engine.faNum(c.base) + ' (۲ به توان ' + Engine.faNum(c.rounds) + ')</span>' +
       '<span>تعداد دور: ' + Engine.faNum(c.rounds) + '</span>' +
       '<span>کل مسابقات: ' + Engine.faNum(c.total) + ' (n−۱)</span>' +
@@ -515,17 +566,17 @@ const UI = (() => {
       '<span>دور اول روی کاغذ: ' + Engine.faNum(c.drawnMatches) + ' بازی (واقعی ' + Engine.faNum(c.realFirst) + ' + استراحت ' + Engine.faNum(c.byes) + ')</span>' +
       '<span>جمع جفت‌سید: ' + Engine.faNum(c.sum) + '</span>' +
       '</div>' +
-      '<div class="calc-note">نمایش استراحت: ' + esc(byeDisp) + (c.byes ? ' • استراحت‌ها به سیدهای بالا رسید' : ' • بدون استراحت') + '</div></div>';
+      '<div class="calc-note">نمایش استراحت: ' + esc(byeDisp) + (c.byes ? ' • استراحت‌ها به سیدهای بالا رسید' : ' • بدون استراحت') + '</div></div></details>';
   }
   /* محاسبات و راهنمای جدول دو حذفی — فصل چهارم */
   function deCalcPanelHtml(t) {
     const c = ensureCalc(t);
     const byeDisp = (t.settings.byeDisplay || 'higher') === 'higher' ? 'توان بالاتر (با B)' : 'توان کمتر (بدون B)';
-    return '<div class="panel pad calc-panel">' +
-      '<div class="calc-head">' +
+    return '<details class="panel calc-panel">' +
+      '<summary class="calc-head">' +
       '<strong>📐 محاسبات جدول دو حذفی</strong>' +
-      '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></div>' +
-      '<div class="calc-grid">' +
+      '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></summary>' +
+      '<div class="calc-body"><div class="calc-grid">' +
       '<span>مبنا: ' + Engine.faNum(c.base) + ' (۲ به توان ' + Engine.faNum(c.rounds) + ')</span>' +
       '<span>استراحت (B): ' + Engine.faNum(c.byes) + '</span>' +
       '<span>مسابقات جدول برنده‌ها: ' + Engine.faNum(c.wbMatches) + '</span>' +
@@ -534,17 +585,17 @@ const UI = (() => {
       '<span>فینال بزرگ: ۱ بازی</span>' +
       '</div>' +
       '<div class="calc-note">حذف با <strong>دو باخت</strong> • بازنده به جدول بازنده‌ها می‌رود؛ اگر قهرمان از جدول بازنده‌ها بیاید یک بازی بیشتر (۲n−۱) می‌شود.</div>' +
-      '<div class="calc-note">نمایش استراحت: ' + esc(byeDisp) + (c.byes ? ' • B ها به برگهٔ پاک‌نویس منتقل می‌شوند' : ' • بدون استراحت') + '</div></div>';
+      '<div class="calc-note">نمایش استراحت: ' + esc(byeDisp) + (c.byes ? ' • B ها به برگهٔ پاک‌نویس منتقل می‌شوند' : ' • بدون استراحت') + '</div></div></details>';
   }
   /* محاسبات و راهنمای جدول آسیایی — فصل سوم */
   function asianCalcPanelHtml(t) {
     const c = ensureCalc(t);
     const byeDisp = (t.settings.byeDisplay || 'higher') === 'higher' ? 'توان بالاتر (با B)' : 'توان کمتر (بدون B)';
-    return '<div class="panel pad calc-panel">' +
-      '<div class="calc-head">' +
+    return '<details class="panel calc-panel">' +
+      '<summary class="calc-head">' +
       '<strong>📐 محاسبات جدول آسیایی</strong>' +
-      '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></div>' +
-      '<div class="calc-grid">' +
+      '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></summary>' +
+      '<div class="calc-body"><div class="calc-grid">' +
       '<span>مبنا: ' + Engine.faNum(c.base) + ' (۲ به توان ' + Engine.faNum(c.rounds) + ')</span>' +
       '<span>مسابقات دور اول: ' + Engine.faNum(c.firstMatches) + '</span>' +
       '<span>جدول جلو (مقام ۱ تا ' + Engine.faNum(c.front) + '): ' + Engine.faNum(c.front) + ' تیم</span>' +
@@ -553,24 +604,24 @@ const UI = (() => {
       '<span>بازی‌های واقعی (بدون استراحت): ' + Engine.faNum(Engine.statsOverview(t).total) + '</span>' +
       '</div>' +
       '<div class="calc-note">بازندگان از دور خارج نمی‌شوند؛ هر بازنده فقط برای بهترین مقام همان دور رقابت می‌کند.</div>' +
-      '<div class="calc-note">نمایش استراحت: ' + esc(byeDisp) + (c.byes ? ' • ' + Engine.faNum(c.byes) + ' استراحت (B)' : ' • بدون استراحت') + '</div></div>';
+      '<div class="calc-note">نمایش استراحت: ' + esc(byeDisp) + (c.byes ? ' • ' + Engine.faNum(c.byes) + ' استراحت (B)' : ' • بدون استراحت') + '</div></div></details>';
   }
   /* محاسبات و راهنمای جدول دوره‌ای — فصل پنجم */
   function roundCalcPanelHtml(t) {
     const c = Engine.roundCalcInfo(Math.max(2, t.teams.length));
     const P = (t.settings && t.settings.points) || { win: 3, draw: 1, loss: 0 };
-    return '<div class="panel pad calc-panel">' +
-      '<div class="calc-head">' +
+    return '<details class="panel calc-panel">' +
+      '<summary class="calc-head">' +
       '<strong>📐 محاسبات جدول دوره‌ای</strong>' +
-      '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></div>' +
-      '<div class="calc-grid">' +
+      '<span class="calc-method">روش: ' + esc(drawMethodFa(t)) + '</span></summary>' +
+      '<div class="calc-body"><div class="calc-grid">' +
       '<span>تعداد دور: ' + Engine.faNum(c.rounds) + (c.odd ? ' (چون تعداد شرکت‌کنندگان فرد است)' : ' (n−۱)') + '</span>' +
       '<span>مسابقه در هر دور: ' + Engine.faNum(c.perRound) + '</span>' +
       '<span>مسابقات هر تیم: ' + Engine.faNum(c.perTeam) + ' (n−۱)</span>' +
       '<span>کل مسابقات: ' + Engine.faNum(c.total) + ' (n(n−۱)÷۲)</span>' +
       '<span>امتیاز: برد ' + Engine.faNum(P.win || 0) + ' • مساوی ' + Engine.faNum(P.draw || 0) + ' • باخت ' + Engine.faNum(P.loss || 0) + '</span>' +
       '</div>' +
-      '<div class="calc-note">همهٔ شرکت‌کنندگان در یک گروه با هم بازی می‌کنند؛ نتیجه می‌تواند مساوی باشد.</div></div>';
+      '<div class="calc-note">همهٔ شرکت‌کنندگان در یک گروه با هم بازی می‌کنند؛ نتیجه می‌تواند مساوی باشد.</div></div></details>';
   }
   /* جدول ثبت نتایج گروه — فصل پنجم */
   function leagueTableHtml(t) {
@@ -612,7 +663,7 @@ const UI = (() => {
       const place = [], back = [];
       (t.asianRounds || []).forEach(rd => {
         const arr = rd.kind === 'back' ? back : place;
-        rd.matches.forEach(m => arr.push(m));
+        rd.matches.forEach(m => { if (!m.hidden && !(m.a === 'BYE' && m.b === 'BYE')) arr.push(m); });
       });
       if (place.length) out.push({ title: '🏅 تعیین مقام‌ها (۳ و ۴ به بعد)', matches: place, kind: 'place', perMatch: true });
       if (back.length) out.push({ title: '🔙 پشت جدول', matches: back, kind: 'lb', perMatch: true });
@@ -707,12 +758,19 @@ const UI = (() => {
         else if (k === 'place') hint.textContent = 'برندهٔ این گروه، بالاترین مقامِ همین گروه را می‌گیرد';
         else hint.textContent = 'پشت جدول: بازندگان دور اول برای نیمهٔ پایین مقام‌ها رقابت می‌کنند';
       }
-      else if (currentRound >= stages.length - 1) hint.textContent = 'برندهٔ فینال بزرگ قهرمان می‌شود 🏆';
+      else if (currentRound >= stages.length - 1) {
+        hint.textContent = (Engine.isDouble(t) && stages[currentRound].kind === 'gf')
+          ? 'برندهٔ فینال بزرگ قهرمان می‌شود 🏆' : 'برندهٔ فینال قهرمان می‌شود 🏆';
+      }
       else if (Engine.isDouble(t) && stages[currentRound].kind === 'wb') hint.textContent = 'برنده به دور بعد می‌رود؛ بازنده به جدول بازنده‌ها منتقل می‌شود';
       else hint.textContent = 'برندهٔ هر بازی به ' + stages[currentRound + 1].title + ' می‌رود';
     }
     const ol = $('overviewBtnLabel');
     if (ol) ol.textContent = overviewOn ? 'نمای مرحله‌ای' : 'کل مسیر';
+    const mb = $('bracketModeBtn');
+    if (mb) mb.textContent = bracketMode === 'list' ? '🌳 نمای درختی' : '📋 نمای فهرستی';
+    const ob = $('overviewExportBtn');
+    if (ob) ob.classList.toggle('hidden', !overviewOn);
 
     const rp = $('roundPanels'), sc = $('bracketScroll'), bl = $('bracketList'), tb = $('bracketToolbar');
     const tp = Engine.isDouble(t) ? null : t.thirdPlace, tpb = $('thirdPlaceBox');
@@ -725,7 +783,7 @@ const UI = (() => {
         const h = x.roundTitle !== lastRt ? '<h3 class="block-title">' + esc(x.roundTitle) + '</h3>' : '';
         lastRt = x.roundTitle;
         return h + matchRow(t, x.m, x.roundTitle);
-      }).join('');
+      }).join('') + (Engine.isRoundRobin(t) ? leagueTableHtml(t) : '');
       if (tp) { tpb.classList.remove('hidden'); tpb.innerHTML = '<h3 class="block-title">بازی رده‌بندی</h3>' + matchRow(t, tp, 'سوم / چهارم'); }
       else if (t.repechage) { tpb.classList.remove('hidden'); tpb.innerHTML = repechageBoxHtml(t); }
       else tpb.classList.add('hidden');
@@ -807,7 +865,7 @@ const UI = (() => {
 
   /* باکس رپشاژ (شانس مجدد) — فصل دوم */
   function repechageBoxHtml(t) {
-    if (Engine.isDouble(t)) return '';
+    if (Engine.isDouble(t) || Engine.isAsian(t) || Engine.isRoundRobin(t)) return '';
     if (!t.champion) return '';
     const f = Engine.finalists(t);
     if (!f) return '';
@@ -952,7 +1010,7 @@ const UI = (() => {
     const t = Store.active(); if (!t) return;
     if (!confirm('تیم حذف شود؟')) return;
     closeModal();
-    Store.removeTeam(t.id, id); render();
+    Store.removeTeam(t.id, id, true); render();
   }
   function openQuickMenu(teamId) {
     const t = Store.active(); if (!t) return;
@@ -1227,7 +1285,7 @@ const UI = (() => {
       statCard(ov.draws, 'مساوی', ov.draws, '🤝') +
       statCard(ov.goals, 'گل', ov.goals, '🥅') +
       statCard(avgGoals, 'میانگین گل', null, '📊') +
-      statCard('۳/' + ov.points.win + '/' + ov.points.draw + '/' + ov.points.loss, 'برد/مساوی/باخت', null, '🏅') + '</div>';
+      statCard(Engine.faNum(ov.points.win) + ' / ' + Engine.faNum(ov.points.draw) + ' / ' + Engine.faNum(ov.points.loss), 'امتیاز برد/مساوی/باخت', null, '🏅') + '</div>';
     const champHtml = leaderNow
       ? '<div class="panel pad stats-champ"><div class="champion-emblem">🏆</div>' +
         (ov.left === 0
@@ -1498,8 +1556,9 @@ const UI = (() => {
   function renderSettings() {
     const t = Store.active();
     if (!t) return;
-    $('setThird').checked = !!t.settings.thirdPlace && !Engine.isDouble(t) && !Engine.isAsian(t);
-    $('setThird').disabled = Engine.isDouble(t) || Engine.isAsian(t);
+    const noThird = Engine.isDouble(t) || Engine.isAsian(t) || Engine.isRoundRobin(t);
+    $('setThird').checked = !!t.settings.thirdPlace && !noThird;
+    $('setThird').disabled = noThird;
     $('setScoring').value = t.settings.scoring || 'goals';
     $('setSeries').value = String(t.settings.series || 1);
     $('setBye').value = t.settings.byeTo || 'top';
@@ -1553,7 +1612,8 @@ const UI = (() => {
   }
   function saveTournamentSettings() {
     const t = Store.active(); if (!t) return;
-    const wantThird = $('setThird').checked;
+    const rr = Engine.isRoundRobin(t);
+    const wantThird = rr ? false : $('setThird').checked;
     if (wantThird !== !!t.settings.thirdPlace) {
       if (guardStructural()) return;
       t.settings.thirdPlace = wantThird;
@@ -1625,6 +1685,8 @@ const UI = (() => {
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         if (!$('modalOverlay').classList.contains('hidden')) { closeModal(); return; }
+        const ms = $('moreSheet');
+        if (ms && !ms.classList.contains('hidden')) { closeMore(); return; }
         if ($('drawer').classList.contains('open')) closeDrawer();
         return;
       }
@@ -1727,8 +1789,31 @@ const UI = (() => {
 
   const dlg = (label, inner) => '<div class="form-row"><span class="label">' + label + '</span>' + inner + '</div>';
 
+  /* ظرفیت مجاز هر نوع جدول (بر پایهٔ محدودیت‌های کتاب) */
+  const CAP_SIZES = {
+    single: [4, 8, 16, 32, 64],
+    double: [4, 8, 16, 32, 64],
+    asian: [2, 4, 6, 8, 10, 11],
+    round: [4, 6, 8, 12, 16, 20, 24, 32]
+  };
+  function sizeOptions(fmt, current) {
+    const list = CAP_SIZES[fmt] || CAP_SIZES.single;
+    return list.map(n => '<option value="' + n + '"' + (String(current) === String(n) ? ' selected' : '') + '>' + n + ' تیم</option>').join('');
+  }
+  function drawFormatChanged() {
+    const sel = $('f_size');
+    if (!sel) return;
+    const fmt = $('f_format').value;
+    const list = CAP_SIZES[fmt] || CAP_SIZES.single;
+    const cur = parseInt(sel.value, 10) || 8;
+    const next = list.indexOf(cur) >= 0 ? cur : (list.filter(n => n >= cur)[0] || list[list.length - 1]);
+    sel.innerHTML = sizeOptions(fmt, next);
+  }
+
   function openTournamentDialog(edit) {
     const t = edit ? Store.active() : null;
+    const locked = !!(t && t.rounds.length);
+    const fmt = t ? (t.format || 'single') : 'single';
     UI._tColor = t ? (t.color || '') : '';
     const swHtml = '<button type="button" class="sw auto' + (!UI._tColor ? ' sel' : '') + '" title="خودکار" onclick="UI.pickColor(this,\'\')"></button>' +
       SPORT_PALETTE.map(c => '<button type="button" class="sw' + (UI._tColor === c ? ' sel' : '') + '" style="background:' + c + '" onclick="UI.pickColor(this,\'' + c + '\')"></button>').join('');
@@ -1736,23 +1821,24 @@ const UI = (() => {
       dlg('نام تورنمنت', '<input id="f_name" class="field" value="' + esc(t ? t.name : '') + '" placeholder="مثال: جام رمضان">') +
       dlg('رشته ورزشی', '<select id="f_sport" class="field">' +
       Object.keys(SPORTS).map(k => '<option value="' + k + '"' + (t && t.sport === k ? ' selected' : '') + '>' + SPORTS[k] + '</option>').join('') + '</select>') +
-      dlg('نوع جدول', '<select id="f_format" class="field"' + (t && t.rounds.length ? ' disabled' : '') + '>' +
-      '<option value="single"' + (!t || (t.format !== 'double' && t.format !== 'asian' && t.format !== 'round') ? ' selected' : '') + '>تک‌حذفی</option>' +
-      '<option value="asian"' + (t && t.format === 'asian' ? ' selected' : '') + '>آسیایی — تا ۱۱ تیم</option>' +
-      '<option value="double"' + (t && t.format === 'double' ? ' selected' : '') + '>دو‌حذفی</option>' +
-      '<option value="round"' + (t && t.format === 'round' ? ' selected' : '') + '>دوره‌ای — همه با هم</option></select>') +
-      dlg('ظرفیت جدول', '<select id="f_size" class="field">' +
-      [4, 8, 16, 32, 64].map(n => '<option value="' + n + '"' + (t && t.targetSize === n ? ' selected' : '') + '>' + n + ' تیم</option>').join('') + '</select>') +
-      dlg('تاریخ شروع', '<input type="date" id="f_start" class="field" value="' + (t ? (t.startDate || '') : '') + '">') +
+      dlg('نوع جدول', '<select id="f_format" class="field"' + (locked ? ' disabled' : ' onchange="UI.drawFormatChanged()"') + '>' +
+      '<option value="single"' + (fmt === 'single' ? ' selected' : '') + '>تک‌حذفی</option>' +
+      '<option value="asian"' + (fmt === 'asian' ? ' selected' : '') + '>آسیایی — تا ۱۱ تیم</option>' +
+      '<option value="double"' + (fmt === 'double' ? ' selected' : '') + '>دو‌حذفی</option>' +
+      '<option value="round"' + (fmt === 'round' ? ' selected' : '') + '>دوره‌ای — همه با هم</option></select>') +
+      dlg('ظرفیت جدول', '<select id="f_size" class="field"' + (locked ? ' disabled' : '') + '>' +
+      sizeOptions(fmt, t ? t.targetSize : 8) + '</select>') +
+      dlg('تاریخ شروع', Jalali.field('f_start', t ? (t.startDate || '') : '')) +
       dlg('محل برگزاری', '<input id="f_place" class="field" value="' + esc(t ? (t.place || '') : '') + '">') +
-      dlg('نوع امتیاز', '<select id="f_scoring" class="field">' +
+      dlg('نوع امتیاز', '<select id="f_scoring" class="field"' + (locked ? ' disabled' : '') + '>' +
       [['goals', 'گل'], ['points', 'امتیاز'], ['sets', 'ست']].map(o => '<option value="' + o[0] + '"' + (t && t.settings.scoring === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>') +
-      dlg('فرمت هر تقابل', '<select id="f_series" class="field">' +
+      dlg('فرمت هر تقابل', '<select id="f_series" class="field"' + (locked ? ' disabled' : '') + '>' +
       [[1, 'تک‌بازی'], [3, 'بهترین از ۳'], [5, 'بهترین از ۵'], [7, 'بهترین از ۷']].map(o => '<option value="' + o[0] + '"' + (t && t.settings.series === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>') +
-      dlg('قرعه استراحت', '<select id="f_bye" class="field">' +
+      dlg('قرعه استراحت', '<select id="f_bye" class="field"' + (locked ? ' disabled' : '') + '>' +
       '<option value="top"' + (t && t.settings.byeTo === 'top' ? ' selected' : '') + '>به سیدهای بالا</option>' +
       '<option value="random"' + (t && t.settings.byeTo === 'random' ? ' selected' : '') + '>تصادفی</option></select>') +
       dlg('رنگ تورنمنت (خودکار = رنگ رشته)', '<div class="swatches" id="t_sw">' + swHtml + '</div>') +
+      (locked ? '<p class="note-block">⚠️ جدول این تورنمنت قرعه‌کشی شده است؛ برای تغییر نوع، ظرفیت یا قواعد، ابتدا از «تنظیمات ← ریست جدول» استفاده کنید.</p>' : '') +
       '<div class="modal-btns"><button class="action primary" onclick="UI.saveTournament(' + (t ? '\'' + t.id + '\'' : 'null') + ')">ذخیره</button>' +
       '<button class="action" onclick="UI.closeModal()">انصراف</button></div>');
   }
@@ -1763,7 +1849,7 @@ const UI = (() => {
     if (el) el.classList.add('sel');
   }
   function saveTournament(id) {
-    const data = { name: $('f_name').value, sport: $('f_sport').value, format: $('f_format') ? $('f_format').value : 'single', targetSize: $('f_size').value, startDate: $('f_start').value, place: $('f_place').value, color: UI._tColor || null };
+    const data = { name: $('f_name').value, sport: $('f_sport').value, format: $('f_format') ? $('f_format').value : 'single', targetSize: $('f_size').value, startDate: Jalali.read('f_start'), place: $('f_place').value, color: UI._tColor || null };
     if (!data.name.trim()) { alert('نام تورنمنت الزامی است.'); return; }
     if (id) {
       const t = Store.active();
@@ -1822,9 +1908,10 @@ const UI = (() => {
   }
   function saveBulk(tid) {
     const lines = $('bulk').value.split('\n').map(s => s.trim()).filter(Boolean);
-    let ok = 0;
-    for (const name of lines) { if (Store.addTeam(tid, { name })) ok++; }
-    alert(ok + ' تیم اضافه شد.');
+    let ok = 0, skip = 0;
+    for (const name of lines) { if (Store.addTeam(tid, { name }, true)) ok++; else skip++; }
+    const msg = ok + ' تیم اضافه شد' + (skip ? ' • ' + skip + ' مورد تکراری یا خارج از ظرفیت بود' : '');
+    alert(msg);
     closeModal(); render();
   }
 
@@ -1867,12 +1954,12 @@ const UI = (() => {
       '<option value="manual"' + (drawMethod === 'manual' ? ' selected' : '') + '>دستی (ترتیب دلخواه با ▲▼)</option></select>') +
       '<div id="seededWrap">' + dlg('تعداد سیدهای مشخص (ترکیبی)', '<select id="draw_seeded" class="field" onchange="UI.drawSeededChg()">' +
       [2, 4, 8].filter(k => k <= t.teams.length).map(k => '<option value="' + k + '"' + (drawSeeded === k ? ' selected' : '') + '>' + Engine.faNum(k) + ' سید اول (S1 تا S' + Engine.faNum(k) + ')</option>').join('') + '</select>') + '</div>' +
-      dlg('استراحت (B)', '<select id="draw_bye_display" class="field">' +
+      (rr ? '' : dlg('استراحت (B)', '<select id="draw_bye_display" class="field">' +
       '<option value="higher"' + ((t.settings.byeDisplay || 'higher') === 'higher' ? ' selected' : '') + '>روش توان بالاتر — با نوشتن B</option>' +
       '<option value="lower"' + (t.settings.byeDisplay === 'lower' ? ' selected' : '') + '>روش توان کمتر/پیشرفته — بدون B (فشرده)</option></select>') +
       dlg('قرعه استراحت به', '<select id="draw_bye" class="field">' +
       '<option value="top"' + ((t.settings.byeTo || 'top') === 'top' ? ' selected' : '') + '>سیدهای بالا</option>' +
-      '<option value="random"' + (t.settings.byeTo === 'random' ? ' selected' : '') + '>تصادفی</option></select>') +
+      '<option value="random"' + (t.settings.byeTo === 'random' ? ' selected' : '') + '>تصادفی</option></select>')) +
       '<div id="drawPreview" class="seed-list"></div>' +
       '<p class="hint-note">⚖️ نکته: هم‌باشگاهی/هم‌شهری‌ها در دور اول حریف هم نشوند؛ در صورت نیاز جای دو سید نزدیک (مثل ۵↔۶ یا ۹↔۱۰) را بعداً جابه‌جا کن. سید ۱ بالا و سید ۲ پایین جدول می‌نشیند تا فینال زودرس نشود.</p>' +
       '<div class="modal-btns"><button class="action primary" onclick="UI.doDraw()">تأیید و ساخت جدول</button>' +
@@ -1930,8 +2017,8 @@ const UI = (() => {
     if (drawMethod === 'manual') {
       t.teams.sort((a, b) => manualOrder.indexOf(a.id) - manualOrder.indexOf(b.id));
     }
-    t.settings.byeTo = $('draw_bye').value;
-    t.settings.byeDisplay = $('draw_bye_display').value;
+    if ($('draw_bye')) t.settings.byeTo = $('draw_bye').value;
+    if ($('draw_bye_display')) t.settings.byeDisplay = $('draw_bye_display').value;
     Store.save();
     const opts = drawMethod === 'combined' ? { seededCount: drawSeeded } : {};
     if (Engine.generateBracket(t, drawMethod, opts)) { buzz(25); closeModal(); currentRound = 0; overviewOn = false; switchView('bracket'); }
@@ -2017,24 +2104,28 @@ const UI = (() => {
       }
       scoreHtml += '</div>';
     } else if (t.settings.scoring === 'goals') {
+      const isRR = Engine.isRoundRobin(t);
+      const lbl = isRR ? sc : sc + ' ۹۰ دقیقه';
       scoreHtml = '<div id="scoreBox">' +
-        stepRow(sc + ' ۹۰ دقیقه — ' + aN, 'mt_a', (m.scoreA === null || m.scoreA === undefined ? '' : m.scoreA)) +
-        stepRow(sc + ' ۹۰ دقیقه — ' + bN, 'mt_b', (m.scoreB === null || m.scoreB === undefined ? '' : m.scoreB)) +
+        stepRow(lbl + ' — ' + aN, 'mt_a', (m.scoreA === null || m.scoreA === undefined ? '' : m.scoreA)) +
+        stepRow(lbl + ' — ' + bN, 'mt_b', (m.scoreB === null || m.scoreB === undefined ? '' : m.scoreB)) +
         presetRow +
+        (isRR ? '' :
         '<div class="form-row"><span class="label">' + sc + ' وقت اضافه (فقط هنگام تساوی)</span><div class="score-pair">' +
         '<input id="mt_ea" class="field" type="number" min="0" placeholder="' + esc(aN) + '" value="' + (m.etA === null || m.etA === undefined ? '' : m.etA) + '">' +
         '<input id="mt_eb" class="field" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (m.etB === null || m.etB === undefined ? '' : m.etB) + '"></div></div>' +
         '<div class="form-row"><span class="label">پنالتی (فقط در صورت تساوی نهایی)</span><div class="score-pair">' +
         '<input id="mt_pa" class="field" type="number" min="0" placeholder="' + esc(aN) + '" value="' + (m.penA === null || m.penA === undefined ? '' : m.penA) + '">' +
-        '<input id="mt_pb" class="field" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (m.penB === null || m.penB === undefined ? '' : m.penB) + '"></div></div></div>';
+        '<input id="mt_pb" class="field" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (m.penB === null || m.penB === undefined ? '' : m.penB) + '"></div></div>') + '</div>';
     } else {
       scoreHtml = '<div id="scoreBox">' +
         stepRow(sc + ' — ' + aN, 'mt_a', (m.scoreA === null || m.scoreA === undefined ? '' : m.scoreA)) +
         stepRow(sc + ' — ' + bN, 'mt_b', (m.scoreB === null || m.scoreB === undefined ? '' : m.scoreB)) +
         presetRow +
+        (Engine.isRoundRobin(t) ? '' :
         '<div class="form-row"><span class="label">پنالتی (فقط در صورت تساوی)</span><div class="score-pair">' +
         '<input id="mt_pa" class="field" type="number" min="0" placeholder="' + esc(aN) + '" value="' + (m.penA === null || m.penA === undefined ? '' : m.penA) + '">' +
-        '<input id="mt_pb" class="field" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (m.penB === null || m.penB === undefined ? '' : m.penB) + '"></div></div></div>';
+        '<input id="mt_pb" class="field" type="number" min="0" placeholder="' + esc(bN) + '" value="' + (m.penB === null || m.penB === undefined ? '' : m.penB) + '"></div></div>') + '</div>';
     }
 
     const c = m.cards || {};
@@ -2077,7 +2168,7 @@ const UI = (() => {
       '<button class="action small" type="button" onclick="UI.addScorerRow()">＋ افزودن بازیکن</button>' +
       '<div id="scorerWarn" class="scorer-warn"></div></section>' : '') +
       '<section class="modal-section"><div class="sec-title">🗓️ زمان‌بندی و توضیحات</div>' +
-      dlg('تاریخ', '<input type="date" id="mt_date" class="field" value="' + (m.date || '') + '">') +
+      dlg('تاریخ', Jalali.field('mt_date', m.date || '')) +
       dlg('ساعت', '<input type="time" id="mt_time" class="field" value="' + (m.time || '') + '">') +
       dlg('محل', '<input id="mt_place" class="field" value="' + esc(m.place || '') + '">') +
       dlg('داور', '<input id="mt_ref" class="field" value="' + esc(m.ref || '') + '">') +
@@ -2175,7 +2266,7 @@ const UI = (() => {
     $('winnerBox').classList.toggle('hidden', v === 'score');
   }
   function collectSchedule() {
-    return { date: $('mt_date').value, time: $('mt_time').value, place: $('mt_place').value, ref: $('mt_ref').value };
+    return { date: Jalali.read('mt_date'), time: $('mt_time').value, place: $('mt_place').value, ref: $('mt_ref').value };
   }
   function saveMatchSchedule(id) {
     const t = Store.active();
@@ -2191,10 +2282,15 @@ const UI = (() => {
       const series = t.settings.series || 1;
       if (series > 1) {
         d.games = [];
+        let incomplete = false;
         for (let i = 0; i < series; i++) {
           const a = $('gm_a_' + i), b = $('gm_b_' + i);
-          if (a && b && (a.value !== '' || b.value !== '')) d.games.push({ a: a.value, b: b.value });
+          const av = a ? a.value : '', bv = b ? b.value : '';
+          if ((av === '') !== (bv === '')) incomplete = true;
+          // جای خالی حفظ می‌شود تا ترتیب بازی‌های سری جابه‌جا نشود
+          d.games.push((av === '' && bv === '') ? { a: null, b: null } : { a: av, b: bv });
         }
+        if (incomplete) { alert('نتیجهٔ هر دو تیم را در همهٔ بازی‌های سری بنویس ✍️'); return; }
       } else {
         d.scoreA = $('mt_a').value; d.scoreB = $('mt_b').value;
         if ($('mt_ea')) { d.etA = $('mt_ea').value; d.etB = $('mt_eb').value; }
@@ -2229,9 +2325,9 @@ const UI = (() => {
   }
 
   return {
-    switchView, render, renderTeams, renderMatches, renderLearn, toggleBracketMode, showRound, toggleOverview, openToolsDialog,
-    selectTournament, openDrawer, closeDrawer,
-    openTournamentDialog, saveTournament, openTeamDialog, saveTeam, removeTeam,
+    switchView, render, renderTeams, renderMatches, renderLearn, toggleBracketMode, setBracketMode, showRound, toggleOverview, openToolsDialog,
+    selectTournament, openDrawer, closeDrawer, openMore, closeMore,
+    openTournamentDialog, saveTournament, openTeamDialog, saveTeam, removeTeam, drawFormatChanged,
     openBulkDialog, saveBulk, bulkFile, openDrawDialog, drawPreview, drawSeededChg, manualMove, doDraw,
     openSwapDialog, doSwap,
     openMatchDialog, matchTypeToggle, saveMatchResult, saveMatchSchedule, clearMatch, toggleLock,

@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#0e1116">
 <title>جدول تک حذفی</title>
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/refresh.css">
 </head>
 <body>
 <a class="skip-link" href="#views">پرش به محتوای اصلی</a>
@@ -64,20 +65,21 @@
       <div id="homeContent" class="hidden">
         <div id="homeDash"></div>
         <div id="homeQuick" class="quick-actions"></div>
-        <div class="view-top">
-          <div>
-            <p class="section-sub">نمای کلی تورنمنت</p>
-            <h2 class="section-title">خانه<span class="dot-accent">.</span></h2>
-          </div>
-          <button class="action small" onclick="Export.pngHome()" aria-label="پوستر مربعی جام">🖼️ پوستر جام</button>
+        <div id="homeStats" class="cards-row"></div>
+        <div class="home-cols">
+          <section class="home-col">
+            <div class="home-col-head"><h3 class="block-title" id="homeTodayTitle">امروز</h3><span id="homeTodayBadge" class="badge-count"></span></div>
+            <div id="homeToday" class="stack"></div>
+          </section>
+          <section class="home-col">
+            <div class="home-col-head"><h3 class="block-title" id="homeUpcomingTitle">پیش رو</h3><span id="homeUpcomingBadge" class="badge-count"></span></div>
+            <div id="homeUpcoming" class="stack"></div>
+          </section>
         </div>
-        <div class="cards-row" id="homeStats"></div>
-        <h3 class="block-title" id="homeTodayTitle">بازی‌های امروز</h3>
-        <div id="homeToday" class="stack"></div>
-        <h3 class="block-title" id="homeUpcomingTitle">بازی‌های پیش رو</h3>
-        <div id="homeUpcoming" class="stack"></div>
-        <h3 class="block-title" id="homeRecentTitle">آخرین نتایج</h3>
-        <div id="homeRecent" class="stack"></div>
+        <section class="home-col">
+          <div class="home-col-head"><h3 class="block-title" id="homeRecentTitle">آخرین نتایج</h3><span id="homeRecentBadge" class="badge-count"></span></div>
+          <div id="homeRecent" class="stack"></div>
+        </section>
       </div>
     </section>
 
@@ -113,7 +115,8 @@
           </div>
           <div class="toolbar-group">
             <button class="action small" onclick="UI.openDrawDialog()">🎲 قرعه‌کشی مجدد</button>
-            <button class="action small" onclick="UI.toggleBracketMode()">📋 نمای فهرستی</button>
+            <button class="action small" id="bracketModeBtn" onclick="UI.toggleBracketMode()">📋 نمای فهرستی</button>
+            <button class="action small hidden" id="overviewExportBtn" onclick="Export.pngOverview()">🖼️ خروجی نمای کل مسیر</button>
             <button class="action small" onclick="Export.png()">🖼️ عکس مربعی</button>
             <button class="action small" onclick="Export.print()">🖨️ چاپ/PDF</button>
             <button class="action small" onclick="Export.csv()">📊 CSV</button>
@@ -254,15 +257,27 @@
 </div>
 
 <nav id="tabbar" aria-label="ناوبری اصلی">
-  <i id="tabInd"></i>
-  <button data-view="home" class="nav-item active">🏠<span>خانه</span></button>
-  <button data-view="bracket" class="nav-item">🏆<span>جدول</span></button>
-  <button data-view="teams" class="nav-item">👥<span>تیم‌ها</span></button>
-  <button data-view="matches" class="nav-item">📋<span>بازی‌ها</span></button>
-  <button data-view="stats" class="nav-item">📊<span>آمار</span></button>
-  <button data-view="learn" class="nav-item">📖<span>آموزش</span></button>
-  <button data-view="settings" class="nav-item">⚙️<span>تنظیمات</span></button>
+  <button data-view="home" class="nav-item active"><i>🏠</i><span>خانه</span></button>
+  <button data-view="bracket" class="nav-item"><i>🏆</i><span>جدول</span></button>
+  <button data-view="teams" class="nav-item"><i>👥</i><span>تیم‌ها</span></button>
+  <button data-view="matches" class="nav-item"><i>📋</i><span>بازی‌ها</span></button>
+  <button data-view="more" class="nav-item" id="moreNavBtn"><i>⋯</i><span>بیشتر</span></button>
 </nav>
+
+<div id="moreSheet" class="more-sheet hidden" role="dialog" aria-modal="true" aria-label="بیشتر">
+  <div class="sheet-grip" aria-hidden="true"></div>
+  <div class="more-grid">
+    <button class="more-item" data-more="stats" onclick="UI.switchView('stats')"><i>📊</i><span>آمار</span></button>
+    <button class="more-item" data-more="learn" onclick="UI.switchView('learn')"><i>📖</i><span>آموزش</span></button>
+    <button class="more-item" data-more="settings" onclick="UI.switchView('settings')"><i>⚙️</i><span>تنظیمات</span></button>
+    <button class="more-item" id="moreThemeBtn" onclick="UI.toggleTheme()"><i>🌙</i><span>تم</span></button>
+  </div>
+  <div class="more-foot">
+    <button class="action small" onclick="UI.closeMore();UI.openDrawer()">🗂️ تورنمنت‌ها</button>
+    <button class="action small" onclick="UI.closeMore();UI.openTournamentDialog()">＋ تورنمنت جدید</button>
+  </div>
+</div>
+<div id="moreOverlay" class="overlay hidden" onclick="UI.closeMore()"></div>
 
 <aside id="drawer" class="drawer" aria-label="تورنمنت‌ها">
   <div class="drawer-head">
@@ -283,6 +298,7 @@
 
 <script src="js/store.js"></script>
 <script src="js/sports.js"></script>
+<script src="js/jalali.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/export.js"></script>
 <script src="js/ui.js"></script>
